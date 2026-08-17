@@ -15,6 +15,7 @@ measurement, which the root `README.md` explains. The rest of the fork lives in
 
 | Document | Kind | Status |
 |---|---|---|
+| [`design/2026-08-17-theme-token-mapping.md`](design/2026-08-17-theme-token-mapping.md) | Design | **Partial.** The theme contract. 4 of 21 role groups decided, 44 of 174 tokens, each with a measured contrast ratio. The implementations follow it and add nothing to it. |
 | [`design/2026-08-17-psiphon-primitive-inventory.md`](design/2026-08-17-psiphon-primitive-inventory.md) | Design | Current. What the Psiphon design language defines, with a source line for every value. An inventory, not a mapping. Read it before touching the theme. |
 | [`design/2026-08-08-minimal-divergence.md`](design/2026-08-08-minimal-divergence.md) | Design | Implemented. Read this first. It explains why the fork is shaped the way it is, and lists where the shipped code differs from the plan. |
 | [`adr/0001-prefer-the-oidc-connector-model.md`](adr/0001-prefer-the-oidc-connector-model.md) | Decision | Accepted. Why the fork reuses the upstream OIDC connector instead of cloning the GitHub connector. Supporting text is historical. |
