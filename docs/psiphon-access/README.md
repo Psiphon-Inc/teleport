@@ -4,8 +4,12 @@ This directory holds the documents that belong to this fork. Everything else
 under `docs/` comes from upstream Teleport and is not fork material.
 
 The fork adds Google Workspace OIDC login and Cloud Identity group membership,
-and rebrands the product as Psiphon Access. It modifies exactly two upstream Go
-files. The rest of the fork lives in `lib/googleoidc` and `tool/teleport-google`.
+and rebrands the product as Psiphon Access. It keeps the modified upstream
+surface as small as the available seams allow. That surface has no fixed size,
+and on 2026-08-17 it is 3 Go files, 9 other files, and 8 files added inside
+upstream directories. Every addition to it needs a reason and a churn
+measurement, which the root `README.md` explains. The rest of the fork lives in
+`lib/googleoidc` and `tool/teleport-google`.
 
 ## What is here
 

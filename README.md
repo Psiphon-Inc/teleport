@@ -37,12 +37,25 @@ code lives in `lib/googleoidc/` and `tool/teleport-google/`, and it attaches
 through seams upstream already provides: the `modules.Modules` interface, the
 plugin registry, and the `auth.OIDCService` interface.
 
-At the time of writing that costs **two modified upstream Go files**. Measure it
-before and after any change:
+Keeping the modified upstream surface small is a **standing goal, not a count**.
+There is no cap. Grow that surface when the change buys something no seam can
+buy, and justify it with two measurements: what the change removes or enables,
+and how often upstream touches the file.
 
 ```bash
+# the surface today
 git diff --stat upstream/master -- . ':!lib/googleoidc' ':!tool/teleport-google'
+
+# the churn of a file you propose to patch
+git log --oneline --since=2023-01-01 -- <file> | wc -l
 ```
+
+On 2026-08-17 the surface is 3 modified upstream Go files, 9 other modified
+upstream files, and 8 files added inside upstream directories. Prefer a
+low-churn file. Over the last three years `lib/versioncontrol/github/github.go`
+took 5 commits and `lib/auth/oidc.go` took 11, while `lib/auth/auth.go` took 529
+and `tool/teleport/common/teleport.go` took 140. A patch in a quiet file costs
+less at every rebase than a clever trick that depends on construction order.
 
 Names that software depends on are unchanged on purpose. The binary is still
 `teleport` at `/usr/local/bin/teleport`, the clients are still `tsh` and `tctl`,
