@@ -1,6 +1,6 @@
 # Psiphon Access theme token mapping
 
-**Status: PARTIAL. 4 of 21 role groups decided, 44 of 174 leaf tokens.** Light
+**Status: PARTIAL. 16 of 21 role groups decided, 94 of 174 leaf tokens.** Light
 values only. Every decision below was approved by the operator on 2026-08-17. The
 remaining groups are listed at the end and are not started.
 
@@ -137,6 +137,53 @@ visible in an interface whose controls are otherwise black, white and grey. Text
 on those tints is far above the floor: black measures 19.00:1, 17.52:1 and 16.30:1
 over white, and 16.41:1, 15.27:1 and 14.33:1 over the deep surface.
 
+### D10. The button border meets the non-text floor
+
+`buttons.border.border` was `rgba(0,0,0,0.36)`, which composites to `#A3A3A3` at
+2.52:1 and fails the 3:1 floor for a control boundary. It becomes alpha 0.42,
+`#949494`, at 3.04:1.
+
+This fixes an inherited Teleport defect rather than expressing a brand choice. The
+rule that no floor is lowered to fit a colour cuts both ways: an inherited value
+that fails is corrected, not carried.
+
+### D11. The warning ink ramp shifts one step darker
+
+Teleport's warning ink fails on white at two of its three steps: `#FFAB00` is
+1.90:1 and `#CC8900` is 2.94:1, against a 3:1 ink floor and a 4.5:1 text floor.
+Only `#996700` passes, at 4.89:1.
+
+So the ink ramp shifts: `warning.main` `#996700` 4.89:1, `warning.hover` `#7A5200`
+6.92:1, `warning.active` `#5C3E00` 9.79:1, the last two by the same 0.8 and 0.6
+channel scale Teleport uses.
+
+This does not contradict D7. D7 keeps amber `#FFAB00` as a solid FILL under a black
+label, at 11.08:1. D11 governs amber as INK. A colour can be legible as a fill and
+illegible as ink, and the two roles need different values.
+
+### D12. The tooltip inverse link uses the kept blue
+
+`tooltip.inverseLinkDefault` was `#009EFF`, which measures 2.77:1 on the inverse
+background `#FBFBFB` and fails. It becomes `#0073BA` at 5.05:1, which is a colour
+the fork already keeps for a reason.
+
+### D13. Two Material leftovers derive from the kept blue
+
+`notice.background` and `highlightedNavigationItem` resolve to `blue.50 #E3F2FD`
+and `blue.200 #90CAF9`, which are Material palette values with no fork source.
+They become the kept blue `#0073BA` at 0.1 and 0.2 over white, giving `#E6F1F8`
+and `#CCE3F1`. Black text measures 18.30:1 and 15.83:1. This ties them to D8
+instead of leaving two orphans.
+
+### D14. The `action` group is dead, and stays untouched
+
+`colors.action.*` has no reader. A search of every web package finds no property
+access and no token string for any of its five leaves. Its values are white
+alphas, which suggests a dark surface that no longer exists.
+
+All five keep Teleport's values. Do not spend judgement on them. If something
+starts reading them, the gate in `ref-rvu4.4` will measure them then.
+
 ## The table
 
 `brand`, 1 leaf.
@@ -195,29 +242,89 @@ pattern of scaling each channel by 0.8 and 0.6. The primary ramp cannot follow i
 because black has nothing left to darken, so it lightens instead. That inversion
 is a fork decision and the app cannot answer it, since the app has no hover state.
 
+`buttons`, 23 leaves.
+
+| Token | Teleport now | Psiphon | Source | Measured |
+|---|---|---|---|---|
+| `buttons.text` | `#000000` | unchanged | app `onSurface` | 21.00:1 on white |
+| `buttons.textDisabled` | `rgba(0,0,0,0.3)` | alpha 0.38, `#9E9E9E` | D5 applied | 2.68:1 exempt |
+| `buttons.bgDisabled` | `rgba(0,0,0,0.12)` | unchanged | no brand value | fill only |
+| `buttons.primary.text` | `#FFFFFF` | unchanged | app `onPrimary` | 21.00:1 on black |
+| `buttons.primary.default` | `#512FC9` | `#000000` | D1 | 21.00:1 |
+| `buttons.primary.hover` | `#4126A1` | `#262626` | D1, lightened | 15.13:1 |
+| `buttons.primary.active` | `#311C79` | `#404040` | D1, lightened | 10.37:1 |
+| `buttons.secondary.default` | `rgba(0,0,0,0.07)` | unchanged, re-sourced | composites to `#EDEDED`, the app's `secondary` | black label 17.94:1 |
+| `buttons.secondary.hover` | `rgba(0,0,0,0.13)` | unchanged | `#DEDEDE` | fill |
+| `buttons.secondary.active` | `rgba(0,0,0,0.18)` | unchanged | `#D1D1D1` | fill |
+| `buttons.border.default` | `rgba(255,255,255,0)` | unchanged | transparent | not applicable |
+| `buttons.border.hover` | `rgba(0,0,0,0.07)` | unchanged | fill, not a boundary | not applicable |
+| `buttons.border.active` | `rgba(0,0,0,0.13)` | unchanged | fill, not a boundary | not applicable |
+| `buttons.border.border` | `rgba(0,0,0,0.36)` | alpha 0.42, `#949494` | D10 | 3.04:1, floor 3.0 |
+| `buttons.warning.text` | `#FFFFFF` | unchanged | app `onError` | see the row below |
+| `buttons.warning.default` | `#CC372D` | `#860A14` | app `failure` | white label 10.16:1 |
+| `buttons.warning.hover` | `#A32C24` | `#6B0810` | derived, 0.8 scale | 12.59:1 |
+| `buttons.warning.active` | `#7A211B` | `#50060C` | derived, 0.6 scale | 15.30:1 |
+| `buttons.trashButton.default` | `rgba(0,0,0,0.07)` | unchanged | neutral fill | the icon carries the meaning |
+| `buttons.trashButton.hover` | `rgba(0,0,0,0.13)` | unchanged | neutral fill | the icon carries the meaning |
+| `buttons.link.default` | `#0073BA` | unchanged | D8 | 5.05:1 |
+| `buttons.link.hover` | `#005C95` | unchanged | D8 | darker than default |
+| `buttons.link.active` | `#004570` | unchanged | D8 | darker than hover |
+
+**A naming trap.** `buttons.warning.*` is Teleport's DESTRUCTIVE button and its
+values are red, while `warning.*` is the amber advisory ink. They are different
+roles with confusingly similar names. `buttons.warning.*` maps to the app's
+`failure`, and `warning.*` maps to the amber ramp of D11. Do not map by name.
+
+The small groups, 27 leaves.
+
+| Token | Teleport now | Psiphon | Source | Measured |
+|---|---|---|---|---|
+| `error.main` | `#CC372D` | `#860A14` | app `failure` | 10.16:1 as ink on white |
+| `error.hover` | `#A32C24` | `#6B0810` | derived, 0.8 scale | 12.59:1 |
+| `error.active` | `#7A211B` | `#50060C` | derived, 0.6 scale | 15.30:1 |
+| `success.main` | `#007D6B` | `#03830E` | app `success` | 4.93:1 |
+| `success.hover` | `#006456` | `#02690B` | derived, 0.8 scale | 6.94:1 |
+| `success.active` | `#004B40` | `#024F08` | derived, 0.6 scale | 9.88:1 |
+| `warning.main` | `#FFAB00` | `#996700` | D11 | 4.89:1 |
+| `warning.hover` | `#CC8900` | `#7A5200` | D11, 0.8 scale | 6.92:1 |
+| `warning.active` | `#996700` | `#5C3E00` | D11, 0.6 scale | 9.79:1 |
+| `accent.main`, `.hover`, `.active` | `#0073BA` ramp | unchanged | D8 | 5.05:1, then darker |
+| `link` | `#0073BA` | unchanged | D8 | 5.05:1 |
+| `progressBarColor` | `#007D6B` | `#03830E` | app `success` | 4.93:1, ink floor 3.0 |
+| `notice.background` | `blue.50 #E3F2FD` | `#E6F1F8` | D13 | black text 18.30:1 |
+| `highlightedNavigationItem` | `blue.200 #90CAF9` | `#CCE3F1` | D13 | black text 15.83:1 |
+| `tooltip.background` | `color-mix(black 80%, sunken)` | unchanged expression | follows D6 | resolves to `#313131`, white text 12.93:1 |
+| `tooltip.inverseBackground` | `color-mix(white 50%, sunken)` | unchanged expression | follows D6 | resolves to `#FBFBFB`, black text 20.29:1 |
+| `tooltip.inverseLinkDefault` | `#009EFF` | `#0073BA` | D12 | 5.05:1, was 2.77:1 |
+| `spotBackground.0`, `.1`, `.2` | `tonal.neutral.*` references | unchanged expressions | follow D9's neutral | fills only |
+| `action.*`, 5 leaves | white alphas | unchanged | D14, unused | not measured, no reader |
+
 ## The change ratio, which `ref-rvu4.5` needs
 
-Of the 44 leaves decided here, **24 change and 20 keep Teleport's value**. The
-keeps are `levels.popout`, `levels.elevated`, `text.main`, `text.muted`,
-`text.primaryInverse`, the three `solid.alert` steps, the three `solid.accent`
-steps, and the nine tonal steps for alert, informational and neutral.
+Of the 94 leaves decided so far, **45 change and 49 keep Teleport's value**, a 48
+percent change rate.
 
-That is a 55 percent change rate on the groups a user sees most. Whether the same
-holds across the remaining 130 leaves is unknown, and the strategy decision should
-wait for the full table.
+The first four groups ran at 24 changed against 20 kept. The twelve groups added
+after them ran at 21 changed against 29 kept, because `buttons` inherits neutral
+alphas that already sit on Psiphon values, and because D8 and D14 keep the blue
+ramps and the dead `action` group whole.
+
+An earlier estimate of the second batch said 41 changed and 53 kept. The measured
+figure is 45 and 49. The estimate was made before `buttons.textDisabled` was
+resolved under D5 and before the keeps were counted one by one. The measured figure
+stands, and nothing was changed to move it.
 
 ## Groups not yet decided
 
-17 groups, 130 leaves: `buttons` 23, `terminal` 23, `dataVisualisation` 21,
-`sessionRecordingTimeline` 21, `sessionRecording` 9, `editor` 6, `action` 5,
-`tooltip` 3, `error` 3, `success` 3, `warning` 3, `accent` 3, `spotBackground` 3,
-`progressBarColor` 1, `notice` 1, `link` 1, `highlightedNavigationItem` 1.
+5 groups, 80 leaves: `terminal` 23, `dataVisualisation` 21,
+`sessionRecordingTimeline` 21, `sessionRecording` 9, `editor` 6.
 
 `terminal` and `editor` are deferred to `ref-rvu4.2`, which owns the monospace face
-and the ANSI palette. The other 15 are simply next.
+and the ANSI palette. That leaves 51 leaves in three groups.
 
-Two of them already have a known problem. `dataVisualisation` needs categorical
-hues, and the brand supplies a gradient rather than categories, so that group needs
-a derivation with measured separation and a colour vision check. `buttons` is the
-largest remaining group and it consumes D1, D2 and D7, so it should follow directly
-after this document is accepted.
+`dataVisualisation` is the hard one. It needs categorical hues, and the brand
+supplies a gradient rather than categories, so it needs a derivation with measured
+separation between every pair and a colour vision check. Derive it inside the
+`ref-rvu4.4` gate, so that both checks are machine-enforced instead of judged by
+eye. `ref-rvu4.2` hit exactly that trap when a contrast-only derivation collapsed
+two ANSI slots onto the same colour.
