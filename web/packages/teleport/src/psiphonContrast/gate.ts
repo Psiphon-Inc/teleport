@@ -264,6 +264,26 @@ export const CONTRAST_BASELINE: readonly BaselineEntry[] = [
     decision: 'D17',
     reason: 'TimeMarks secondary tick #A1A1A1 fails 3:1 non-text floor',
   },
+  {
+    id: 'dataVis-secondary.picton-on-interactive.tonal.neutral.2',
+    tokenA: 'dataVisualisation.secondary.picton',
+    tokenB: 'interactive.tonal.neutral.2',
+    measuredRatio: 2.44,
+    floor: 3,
+    decision: 'None',
+    reason:
+      'ProgressBar fill secondary.picton #0089DE on tonal neutral 2 #D1D1D1 fails 3:1 non-text floor',
+  },
+  {
+    id: 'dataVis-secondary.caribbean-on-interactive.tonal.neutral.2',
+    tokenA: 'dataVisualisation.secondary.caribbean',
+    tokenB: 'interactive.tonal.neutral.2',
+    measuredRatio: 2.42,
+    floor: 3,
+    decision: 'None',
+    reason:
+      'ProgressBar fill secondary.caribbean #009681 on tonal neutral 2 #D1D1D1 fails 3:1 non-text floor',
+  },
 
   // --- 46 SEPARATION RULE KNOWN FAILURES ---
   // Primary tier dataVisualisation series separation failures (16 rules)

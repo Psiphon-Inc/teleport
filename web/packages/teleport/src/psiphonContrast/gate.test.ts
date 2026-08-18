@@ -42,9 +42,9 @@ describe('psiphonContrast gate', () => {
 
     // Verify expected counts
     expect(evaluation.leafCount).toBe(174);
-    expect(evaluation.counts.totalPairs).toBe(185);
-    expect(evaluation.counts.pass).toBe(125);
-    expect(evaluation.counts.baseline).toBe(22);
+    expect(evaluation.counts.totalPairs).toBe(179);
+    expect(evaluation.counts.pass).toBe(117);
+    expect(evaluation.counts.baseline).toBe(24);
     expect(evaluation.counts.exempt).toBe(7);
     expect(evaluation.counts.notBoundary).toBe(3);
     expect(evaluation.counts.deferred).toBe(28);

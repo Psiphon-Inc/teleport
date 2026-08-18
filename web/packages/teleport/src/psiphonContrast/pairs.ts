@@ -92,6 +92,79 @@ export const EXCLUDED_GROUPS: readonly ExcludedGroup[] = [
   },
 ];
 
+/**
+ * Record for an excluded / unused theme leaf with no live reader in the shipped UI.
+ */
+export interface ExcludedLeaf {
+  readonly path: string;
+  readonly reason: string;
+}
+
+export const EXCLUDED_LEAVES: readonly ExcludedLeaf[] = [
+  {
+    path: 'dataVisualisation.primary.purple',
+    reason:
+      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+  },
+  {
+    path: 'dataVisualisation.primary.wednesdays',
+    reason:
+      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+  },
+  {
+    path: 'dataVisualisation.primary.picton',
+    reason:
+      'Reachable only through theme.type === "dark" branch in web/packages/teleport/src/ManagedUpdates/shared.tsx:265 (dead in light-only fork)',
+  },
+  {
+    path: 'dataVisualisation.primary.caribbean',
+    reason:
+      'Reachable only through theme.type === "dark" branch in web/packages/teleport/src/ManagedUpdates/shared.tsx:260 (dead in light-only fork)',
+  },
+  {
+    path: 'dataVisualisation.primary.abbey',
+    reason: 'No reader anywhere in web/packages',
+  },
+  {
+    path: 'dataVisualisation.primary.cyan',
+    reason:
+      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+  },
+  {
+    path: 'dataVisualisation.secondary.purple',
+    reason:
+      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+  },
+  {
+    path: 'dataVisualisation.secondary.wednesdays',
+    reason:
+      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+  },
+  {
+    path: 'dataVisualisation.secondary.sunflower',
+    reason: 'No reader anywhere in web/packages',
+  },
+  {
+    path: 'dataVisualisation.secondary.abbey',
+    reason: 'No reader anywhere in web/packages',
+  },
+  {
+    path: 'dataVisualisation.secondary.cyan',
+    reason:
+      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+  },
+  {
+    path: 'dataVisualisation.tertiary.wednesdays',
+    reason:
+      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+  },
+  {
+    path: 'dataVisualisation.tertiary.cyan',
+    reason:
+      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+  },
+];
+
 const LEVEL_SURFACES = [
   'levels.surface',
   'levels.sunken',
@@ -138,8 +211,6 @@ const DATA_VIS_TIERS = [
     ],
   },
 ] as const;
-
-const DATA_VIS_TOKENS = DATA_VIS_TIERS.flatMap(t => t.tokens);
 
 const ANSI_SLOTS = [
   { normal: 'terminal.black', bright: 'terminal.brightBlack', name: 'black' },
@@ -812,19 +883,165 @@ function buildContrastPairs(): ContrastPair[] {
     floorReason: 'WCAG 2.1 AA 1.4.3 time mark text floor',
   });
 
-  // 12. DataVisualisation group against chart surface (levels.surface)
-  for (const visToken of DATA_VIS_TOKENS) {
-    const shortName = visToken.replace('dataVisualisation.', '');
-    pairs.push({
-      id: `dataVis-${shortName}-on-surface`,
-      fgPath: visToken,
-      bgPath: 'levels.surface',
-      floor: 3,
-      kind: 'nonText',
-      floorReason:
-        'WCAG 2.1 AA 1.4.11 non-text graphical object floor for chart series ink',
-    });
-  }
+  // 12. DataVisualisation live reader pairs
+  // The pair manifest originally assigned floors and backgrounds by group against chart surface.
+  // Recon proved this product draws no chart; live readers use these tokens as borders, icons,
+  // fills, and text on tonal or elevated backgrounds. Surface pairs are retained for status accent
+  // tokens because statusColors.ts border variant renders on transparent bg over plain surface.
+
+  // 12a. Label.tsx outline variants (text floor 4.5)
+  pairs.push({
+    id: 'dataVis-primary.sunflower-on-interactive.tonal.alert.0',
+    fgPath: 'dataVisualisation.primary.sunflower',
+    bgPath: 'interactive.tonal.alert.0',
+    floor: 4.5,
+    kind: 'normalText',
+    floorReason:
+      'web/packages/design/src/Label/Label.tsx:140,142 outline-warning label text',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.abbey-on-interactive.tonal.danger.0',
+    fgPath: 'dataVisualisation.tertiary.abbey',
+    bgPath: 'interactive.tonal.danger.0',
+    floor: 4.5,
+    kind: 'normalText',
+    floorReason:
+      'web/packages/design/src/Label/Label.tsx:157 outline-danger label text',
+  });
+
+  // 12b. ManagedUpdates/shared.tsx ProgressBar fills (non-text fill floor 3)
+  pairs.push({
+    id: 'dataVis-secondary.picton-on-interactive.tonal.neutral.2',
+    fgPath: 'dataVisualisation.secondary.picton',
+    bgPath: 'interactive.tonal.neutral.2',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/teleport/src/ManagedUpdates/shared.tsx:264 ProgressBar fill on tonal neutral',
+  });
+
+  pairs.push({
+    id: 'dataVis-secondary.caribbean-on-interactive.tonal.neutral.2',
+    fgPath: 'dataVisualisation.secondary.caribbean',
+    bgPath: 'interactive.tonal.neutral.2',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/teleport/src/ManagedUpdates/shared.tsx:259 ProgressBar fill on tonal neutral',
+  });
+
+  // 12c. StatusColors.ts status accents (non-text border/icon floor 3 on tonal bg & plain surface)
+  pairs.push({
+    id: 'dataVis-tertiary.purple-on-interactive.tonal.primary.0',
+    fgPath: 'dataVisualisation.tertiary.purple',
+    bgPath: 'interactive.tonal.primary.0',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/design/src/Status/statusColors.ts:67,88-112 primary status border/icon on tonal primary',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.purple-on-surface',
+    fgPath: 'dataVisualisation.tertiary.purple',
+    bgPath: 'levels.surface',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/design/src/Status/statusColors.ts:88-112 primary status border variant on surface',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.picton-on-interactive.tonal.informational.2',
+    fgPath: 'dataVisualisation.tertiary.picton',
+    bgPath: 'interactive.tonal.informational.2',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/design/src/Status/statusColors.ts:52,88-112 info status border/icon on tonal informational',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.picton-on-surface',
+    fgPath: 'dataVisualisation.tertiary.picton',
+    bgPath: 'levels.surface',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/design/src/Status/statusColors.ts:88-112 info status border variant on surface',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.sunflower-on-interactive.tonal.alert.2',
+    fgPath: 'dataVisualisation.tertiary.sunflower',
+    bgPath: 'interactive.tonal.alert.2',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/design/src/Status/statusColors.ts:46,88-112 warning status border/icon on tonal alert',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.sunflower-on-surface',
+    fgPath: 'dataVisualisation.tertiary.sunflower',
+    bgPath: 'levels.surface',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/design/src/Status/statusColors.ts:88-112 warning status border variant on surface',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.caribbean-on-interactive.tonal.success.1',
+    fgPath: 'dataVisualisation.tertiary.caribbean',
+    bgPath: 'interactive.tonal.success.1',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/design/src/Status/statusColors.ts:40,88-112 success status border/icon on tonal success',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.caribbean-on-surface',
+    fgPath: 'dataVisualisation.tertiary.caribbean',
+    bgPath: 'levels.surface',
+    floor: 3,
+    kind: 'nonText',
+    floorReason:
+      'web/packages/design/src/Status/statusColors.ts:88-112 success status border variant on surface',
+  });
+
+  // 12d. LatencyDiagnostic.tsx text usages (text floor 4.5 on levels.elevated)
+  pairs.push({
+    id: 'dataVis-tertiary.sunflower-on-levels.elevated',
+    fgPath: 'dataVisualisation.tertiary.sunflower',
+    bgPath: 'levels.elevated',
+    floor: 4.5,
+    kind: 'normalText',
+    floorReason:
+      'web/packages/shared/components/LatencyDiagnostic/LatencyDiagnostic.tsx:33 Error latency text on elevated surface',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.caribbean-on-levels.elevated',
+    fgPath: 'dataVisualisation.tertiary.caribbean',
+    bgPath: 'levels.elevated',
+    floor: 4.5,
+    kind: 'normalText',
+    floorReason:
+      'web/packages/shared/components/LatencyDiagnostic/LatencyDiagnostic.tsx:31 Ok latency text on elevated surface',
+  });
+
+  pairs.push({
+    id: 'dataVis-tertiary.abbey-on-levels.elevated',
+    fgPath: 'dataVisualisation.tertiary.abbey',
+    bgPath: 'levels.elevated',
+    floor: 4.5,
+    kind: 'normalText',
+    floorReason:
+      'web/packages/shared/components/LatencyDiagnostic/LatencyDiagnostic.tsx:32 Warn latency text on elevated surface',
+  });
 
   // 13. Terminal group - DEFERRED to ref-rvu4.2
   for (const termToken of TERMINAL_DEFERRED_TOKENS) {

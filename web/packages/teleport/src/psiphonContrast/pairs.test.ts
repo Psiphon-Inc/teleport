@@ -17,7 +17,12 @@
  */
 
 import { contrastRatio } from './color';
-import { CONTRAST_PAIRS, EXCLUDED_GROUPS, SEPARATION_RULES } from './pairs';
+import {
+  CONTRAST_PAIRS,
+  EXCLUDED_GROUPS,
+  EXCLUDED_LEAVES,
+  SEPARATION_RULES,
+} from './pairs';
 import { getResolvedThemeColors } from './themeColors';
 
 describe('psiphonContrast / pairs', () => {
@@ -142,6 +147,11 @@ describe('psiphonContrast / pairs', () => {
       ex => !resolvedGroups.has(ex.group)
     ).map(ex => ex.group);
     expect(invalidGroups).toEqual([]);
+
+    const invalidLeaves = EXCLUDED_LEAVES.filter(
+      ex => !resolvedPaths.has(ex.path)
+    ).map(ex => ex.path);
+    expect(invalidLeaves).toEqual([]);
   });
 
   it('AC4: represents every role group, accounting for all 174 leaves, with terminal and editor deferred', () => {
@@ -191,6 +201,87 @@ describe('psiphonContrast / pairs', () => {
     const actionExclusion = EXCLUDED_GROUPS.find(g => g.group === 'action');
     expect(actionExclusion).toBeDefined();
     expect(actionExclusion!.reason).toMatch(/D14/);
+  });
+
+  it('ref-rvu4.1.2: dataVisualisation manifest reflects real reader usage, 13 dead leaves excluded, 8 live leaves paired with reader citations', () => {
+    // Exactly 13 leaves recorded as having no live reader
+    expect(EXCLUDED_LEAVES.length).toBe(13);
+
+    const deadPaths = new Set(EXCLUDED_LEAVES.map(l => l.path));
+    expect(deadPaths.size).toBe(13);
+
+    // Confirm specific 11 dead leaves in web/packages and 2 dark-theme branch dead leaves
+    expect(deadPaths.has('dataVisualisation.primary.purple')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.primary.wednesdays')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.primary.picton')).toBe(true); // dark branch
+    expect(deadPaths.has('dataVisualisation.primary.caribbean')).toBe(true); // dark branch
+    expect(deadPaths.has('dataVisualisation.primary.abbey')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.primary.cyan')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.secondary.purple')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.secondary.wednesdays')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.secondary.sunflower')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.secondary.abbey')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.secondary.cyan')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.tertiary.wednesdays')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.tertiary.cyan')).toBe(true);
+
+    // None of the 13 dead leaves carry an invented contrast pair
+    const deadPairs = CONTRAST_PAIRS.filter(p => deadPaths.has(p.fgPath));
+    expect(deadPairs).toEqual([]);
+
+    // 8 live leaves all carry pairs
+    const liveLeaves = [
+      'dataVisualisation.primary.sunflower',
+      'dataVisualisation.secondary.picton',
+      'dataVisualisation.secondary.caribbean',
+      'dataVisualisation.tertiary.purple',
+      'dataVisualisation.tertiary.picton',
+      'dataVisualisation.tertiary.sunflower',
+      'dataVisualisation.tertiary.caribbean',
+      'dataVisualisation.tertiary.abbey',
+    ];
+
+    const dataVisPairs = CONTRAST_PAIRS.filter(p =>
+      p.fgPath.startsWith('dataVisualisation.')
+    );
+    const liveFgPaths = new Set(dataVisPairs.map(p => p.fgPath));
+
+    for (const leaf of liveLeaves) {
+      expect(liveFgPaths.has(leaf)).toBe(true);
+    }
+
+    // Every dataVisualisation pair cites file and line of reader in floorReason
+    for (const pair of dataVisPairs) {
+      expect(pair.floorReason).toMatch(/web\/packages\/.*:\d+/);
+    }
+
+    // Label outline pairs (text floor 4.5)
+    const warningLabelPair = CONTRAST_PAIRS.find(
+      p => p.id === 'dataVis-primary.sunflower-on-interactive.tonal.alert.0'
+    );
+    expect(warningLabelPair).toBeDefined();
+    expect(warningLabelPair!.floor).toBe(4.5);
+    expect(warningLabelPair!.kind).toBe('normalText');
+    expect(warningLabelPair!.floorReason).toContain('Label.tsx:140,142');
+
+    const dangerLabelPair = CONTRAST_PAIRS.find(
+      p => p.id === 'dataVis-tertiary.abbey-on-interactive.tonal.danger.0'
+    );
+    expect(dangerLabelPair).toBeDefined();
+    expect(dangerLabelPair!.floor).toBe(4.5);
+    expect(dangerLabelPair!.kind).toBe('normalText');
+    expect(dangerLabelPair!.floorReason).toContain('Label.tsx:157');
+
+    // Retained status surface pairs
+    const statusSurfacePairs = CONTRAST_PAIRS.filter(
+      p =>
+        p.fgPath.startsWith('dataVisualisation.') &&
+        p.bgPath === 'levels.surface'
+    );
+    expect(statusSurfacePairs.length).toBe(4);
+    for (const p of statusSurfacePairs) {
+      expect(p.floorReason).toContain('statusColors.ts:88-112');
+    }
   });
 
   it('AC5: separation rules cover intra-tier dataVisualisation series (63 pairs: 3 tiers x 21 intra-tier pairs) and ANSI normal vs bright slots (8 pairs)', () => {
