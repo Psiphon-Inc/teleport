@@ -1,6 +1,6 @@
 # Psiphon Access theme token mapping
 
-**Status: PARTIAL. 16 of 21 role groups decided, 94 of 174 leaf tokens.** Light
+**Status: PARTIAL. 18 of 21 role groups decided, 124 of 174 leaf tokens.** Light
 values only. Every decision below was approved by the operator on 2026-08-17. The
 remaining groups are listed at the end and are not started.
 
@@ -184,6 +184,69 @@ alphas, which suggests a dark surface that no longer exists.
 All five keep Teleport's values. Do not spend judgement on them. If something
 starts reading them, the gate in `ref-rvu4.4` will measure them then.
 
+### D15. Progress ink is the 0.8 accent step, and the track alpha is pinned
+
+The playback progress fill and the timeline playhead use `#CC5A30`, the 0.8 channel
+scale of the brand accent.
+
+D3's `#D95F33` was proposed first and refused by measurement. It clears 3:1 on
+white at 3.73:1, but a progress fill is read against its own track, not against the
+page, and on the 0.1 neutral track it measures **2.99:1**. A progress fill is a part
+of a graphic required to understand the content, so 3:1 applies.
+
+`#CC5A30` measures 3.32:1 on the 0.1 track and 3.14:1 on a 0.12 track. **The track
+alpha is therefore load-bearing and must stay at 0.10, and never exceed 0.12.** At
+0.15 the fill fails again at 2.93:1. Anyone darkening the track must re-measure the
+fill.
+
+### D16. The risk scale separates by luminance, and colour is never the only cue
+
+Four steps: low `#03830E`, medium `#7A5200`, high `#860A14`, critical `#000000`.
+
+The first proposal used the D11 warning ink `#996700` for medium. It was refused:
+`#03830E` against `#996700` measures **1.01:1**, so green and amber sat at
+effectively identical luminance and differed only in hue. Green against amber is the
+classic deuteranopia confusion, so that pair would have been unreadable for some
+users and indistinguishable in greyscale for everyone. Moving medium to `#7A5200`
+raises the pair to 1.40:1.
+
+Teleport's own scale is no better. Its high against critical, `#CC372D` against
+`#A32C24`, measures 1.41:1.
+
+**Four steps cannot be separated by colour alone at any values available here.** So
+the risk level must also carry a non-colour cue, which WCAG 1.4.1 requires in any
+case. A label, an icon or a shape. The same rule applies to
+`sessionRecording.user` against `sessionRecording.resource`, which separate by only
+2.09:1 and rely on hue.
+
+Pairwise separations of the chosen scale: low to medium 1.40:1, medium to high
+2.08:1, high to critical 2.07:1, and 4.26:1 to 4.29:1 from low and medium to
+critical.
+
+### D17. Timeline ink that carries information meets the non-text floor
+
+Four inherited values sat below 3:1 on the timeline surface and are raised to alpha
+0.42, `#949494`, at 3.04:1: `cursor` was 0.4 at 2.85:1, `timeMarks.secondary` was
+0.36 at 2.52:1, `frameBorder` was 0.2 at 1.61:1, and `border.default` was the
+off-palette `#4c516e`. `border.hover` becomes `#5C5C5C` at 6.69:1.
+
+`frameBorder` is arguably decorative structure rather than a control boundary, and
+keeping it was considered. The operator raised it on 2026-08-17, on the reasoning
+that a frame boundary a user relies on to read the timeline is information.
+
+`timeMarks.primary` at 4.59:1 and `timeMarks.absolute` at 16.07:1 already pass and
+keep their values.
+
+### D18. Chip text is fully opaque
+
+Two inherited chip labels failed because they were translucent over a coloured
+chip. `events.join.text` was white at 0.8 over the kept blue and measured 3.80:1; it
+becomes pure white at 5.05:1. `events.inactivity.text` was black at 0.6 over the
+tint and measured 3.12:1; it becomes pure black at 11.42:1.
+
+The general rule: a label on a coloured chip is opaque. Translucency saves nothing
+and costs legibility.
+
 ## The table
 
 `brand`, 1 leaf.
@@ -299,32 +362,74 @@ The small groups, 27 leaves.
 | `spotBackground.0`, `.1`, `.2` | `tonal.neutral.*` references | unchanged expressions | follow D9's neutral | fills only |
 | `action.*`, 5 leaves | white alphas | unchanged | D14, unused | not measured, no reader |
 
+`sessionRecording`, 9 leaves.
+
+| Token | Teleport now | Psiphon | Source | Measured |
+|---|---|---|---|---|
+| `player.progressBar.background` | `rgba(0,0,0,0.1)` | unchanged, **pinned** | D15 | track for the fill below |
+| `player.progressBar.seeking` | `rgba(0,0,0,0.15)` | unchanged | neutral fill | not information |
+| `player.progressBar.progress` | `#9F85FF` | `#CC5A30` | D15 | 3.32:1 on the track |
+| `resource` | `#004570` | unchanged | D8's darkest blue | 10.07:1 on white |
+| `user` | `#311C79` | `#000000` | D1 | 21.00:1 on white |
+| `riskLevels.low` | `#007D6B` | `#03830E` | app `success` | 4.93:1 on white |
+| `riskLevels.medium` | `#FFAB00` | `#7A5200` | D16 | 6.92:1 on white |
+| `riskLevels.high` | `#CC372D` | `#860A14` | app `failure` | 10.16:1 on white |
+| `riskLevels.critical` | `#A32C24` | `#000000` | D16 | 21.00:1 on white |
+
+`sessionRecordingTimeline`, 21 leaves.
+
+| Token | Teleport now | Psiphon | Source | Measured |
+|---|---|---|---|---|
+| `background` | `#FBFBFC` | `#FFFFFF` | D6 | black text 21.00:1 |
+| `headerBackground` | `rgba(0,0,0,0.05)` | unchanged | neutral fill | not information |
+| `frameBorder` | `rgba(0,0,0,0.2)` | alpha 0.42, `#949494` | D17 | 3.04:1, was 1.61:1 |
+| `progressLine` | `#E53E3E` | `#CC5A30` | D15 | 3.32:1 on the track |
+| `border.default` | `#4c516e` | `#949494` | D17 | 3.03:1 |
+| `border.hover` | `#5f659e` | `#5C5C5C` | D17 | 6.69:1 |
+| `cursor` | `rgba(0,0,0,0.4)` | alpha 0.42, `#949494` | D17 | 3.04:1, was 2.85:1 |
+| `events.inactivity.background` | `rgba(81,47,201,0.25)` | black at 0.25, `#BFBFBF` | neutral reads as absence, not alert | black text 11.42:1 |
+| `events.inactivity.text` | `rgba(0,0,0,0.6)` | `#000000` | D18 | 11.42:1, was 3.12:1 |
+| `events.resize.semiBackground` | `rgba(0,0,0,0.8)` | unchanged | overlay, resolves to `#333333` | white text 12.63:1 |
+| `events.resize.background` | `#86c4ed` | `#B2D5EA` | kept blue at 0.30, D13 pattern | black text 13.60:1 |
+| `events.resize.border` | `#26323c` | `#000000` | replaces an off-palette slate | 21.00:1 |
+| `events.resize.text` | `#26323c` | `#000000` | replaces an off-palette slate | 13.60:1 on the chip |
+| `events.join.background` | `#0073BA` | unchanged | D8 | white text 5.05:1 |
+| `events.join.text` | `rgba(255,255,255,0.8)` | `#FFFFFF` | D18 | 5.05:1, was 3.80:1 |
+| `events.default.background` | `rgba(0,0,0,0.54)` | unchanged, `#757575` | matches the app's `subtleText` value | black text 4.56:1 |
+| `events.default.text` | `#000` | unchanged | D1 | 4.56:1, passes but marginal |
+| `timeMarks.primary` | `rgba(0,0,0,0.54)` | unchanged | already passes | 4.59:1 |
+| `timeMarks.secondary` | `rgba(0,0,0,0.36)` | alpha 0.42, `#949494` | D17 | 3.04:1, was 2.52:1 |
+| `timeMarks.absolute` | `rgba(0,0,0,0.87)` | unchanged | already passes | 16.07:1 |
+| `timeMarks.text` | `rgba(0,0,0,0.87)` | unchanged | already passes | 16.07:1 |
+
 ## The change ratio, which `ref-rvu4.5` needs
 
-Of the 94 leaves decided so far, **45 change and 49 keep Teleport's value**, a 48
+Of the 124 leaves decided so far, **64 change and 60 keep Teleport's value**, a 52
 percent change rate.
 
-The first four groups ran at 24 changed against 20 kept. The twelve groups added
-after them ran at 21 changed against 29 kept, because `buttons` inherits neutral
-alphas that already sit on Psiphon values, and because D8 and D14 keep the blue
-ramps and the dead `action` group whole.
+By batch: the first four groups ran 24 changed against 20 kept, `buttons` and the
+small groups ran 21 against 29, and the two session recording groups ran 19 against
+11. The recording groups change the most, because they inherit purple identifiers,
+an off-palette slate and four values that sat below their floors.
 
-An earlier estimate of the second batch said 41 changed and 53 kept. The measured
-figure is 45 and 49. The estimate was made before `buttons.textDisabled` was
-resolved under D5 and before the keeps were counted one by one. The measured figure
-stands, and nothing was changed to move it.
+Every figure here was counted leaf by leaf. An earlier estimate for the second batch
+said 41 changed and 53 kept across 94 leaves; the counted figure was 45 and 49, and
+nothing was altered to move toward the estimate.
 
 ## Groups not yet decided
 
-5 groups, 80 leaves: `terminal` 23, `dataVisualisation` 21,
-`sessionRecordingTimeline` 21, `sessionRecording` 9, `editor` 6.
+3 groups, 50 leaves: `terminal` 23, `dataVisualisation` 21, `editor` 6.
 
-`terminal` and `editor` are deferred to `ref-rvu4.2`, which owns the monospace face
-and the ANSI palette. That leaves 51 leaves in three groups.
+`terminal` and `editor`, 29 leaves, are deferred to `ref-rvu4.2`, which owns the
+monospace face and the ANSI palette.
 
-`dataVisualisation` is the hard one. It needs categorical hues, and the brand
-supplies a gradient rather than categories, so it needs a derivation with measured
-separation between every pair and a colour vision check. Derive it inside the
-`ref-rvu4.4` gate, so that both checks are machine-enforced instead of judged by
-eye. `ref-rvu4.2` hit exactly that trap when a contrast-only derivation collapsed
-two ANSI slots onto the same colour.
+`dataVisualisation`, 21 leaves, is the only group left for this document, and it is
+deliberately last. It needs categorical hues, the brand supplies a gradient rather
+than categories, and the series must separate from each other as well as from the
+chart surface. Derive it inside the `ref-rvu4.4` gate so that pair separation and a
+colour vision check are machine-enforced.
+
+That recommendation is not a preference. Eyeballed hue separation failed twice while
+this document was written. `ref-rvu4.2` collapsed `cyan` and `br_cyan` onto one
+value, and D16 here collapsed the risk scale's low and medium to 1.01:1. A chart
+with 21 leaves offers far more chances to repeat it.
