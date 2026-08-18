@@ -14,6 +14,16 @@ The file is dated for the day it was written. `ref-rvu4.1` names a
 
 ## What this document does not do
 
+It does not carry a second table for the older styled-components layer, because
+that layer holds no colour of its own. `web/packages/design/src/theme/themes/types.ts:69`
+declares `ThemeDefinition = Omit<Theme, 'colors'>`, so a theme definition cannot
+hold colours at all. `resolveTheme.ts:38` then returns one constant,
+`LEGACY_THEME_COLORS`, for every theme. Measured at `caceda7b573`, that constant
+holds 476 leaves in 55 groups, and all 476 are `var(--teleport-*)` references
+with no literal value. The styled-components layer is therefore a pointer layer
+into the CSS variables that the Chakra config emits. Author the Chakra side and
+the older components follow.
+
 It authors no dark value. It does not restate the Psiphon primitives, which live
 with their source lines in
 [`2026-08-17-psiphon-primitive-inventory.md`](2026-08-17-psiphon-primitive-inventory.md).
