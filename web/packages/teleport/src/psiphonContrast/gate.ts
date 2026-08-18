@@ -204,7 +204,7 @@ export const CONTRAST_BASELINE: readonly BaselineEntry[] = [
     id: 'sessionRecording-progress-on-trackBg',
     tokenA: 'sessionRecording.player.progressBar.progress',
     tokenB: 'sessionRecording.player.progressBar.background',
-    measuredRatio: 2.31,
+    measuredRatio: 1.9,
     floor: 3,
     decision: 'D15',
     reason:
@@ -256,6 +256,16 @@ export const CONTRAST_BASELINE: readonly BaselineEntry[] = [
     reason: 'Translucent join event text #CCE3F1 on #0073BA fails 4.5:1 floor',
   },
   {
+    id: 'timeline-events-default-text-on-bg',
+    tokenA: 'sessionRecordingTimeline.events.default.text',
+    tokenB: 'sessionRecordingTimeline.events.default.background',
+    measuredRatio: 3.93,
+    floor: 4.5,
+    decision: 'None',
+    reason:
+      'Black text on translucent default event background over deep surface fails 4.5:1 floor',
+  },
+  {
     id: 'timeline-timeMarks-secondary-on-bg',
     tokenA: 'sessionRecordingTimeline.timeMarks.secondary',
     tokenB: 'sessionRecordingTimeline.background',
@@ -268,7 +278,7 @@ export const CONTRAST_BASELINE: readonly BaselineEntry[] = [
     id: 'dataVis-secondary.picton-on-interactive.tonal.neutral.2',
     tokenA: 'dataVisualisation.secondary.picton',
     tokenB: 'interactive.tonal.neutral.2',
-    measuredRatio: 2.44,
+    measuredRatio: 2.02,
     floor: 3,
     decision: 'None',
     reason:
@@ -278,7 +288,7 @@ export const CONTRAST_BASELINE: readonly BaselineEntry[] = [
     id: 'dataVis-secondary.caribbean-on-interactive.tonal.neutral.2',
     tokenA: 'dataVisualisation.secondary.caribbean',
     tokenB: 'interactive.tonal.neutral.2',
-    measuredRatio: 2.42,
+    measuredRatio: 2,
     floor: 3,
     decision: 'None',
     reason:
@@ -769,15 +779,6 @@ export interface GateEvaluation {
   };
 }
 
-const WHITE_SURFACE: OpaqueColor = { r: 255, g: 255, b: 255, alpha: 1 };
-
-function resolveOpaqueBg(color: Color): OpaqueColor {
-  if (isOpaque(color)) {
-    return color;
-  }
-  return composite(color, WHITE_SURFACE);
-}
-
 function resolveOpaqueFg(fgColor: Color, bgOpaque: OpaqueColor): OpaqueColor {
   if (isOpaque(fgColor)) {
     return fgColor;
@@ -822,7 +823,28 @@ export function evaluateContrastGate(
       throw new Error(`Missing leaf color for bgPath "${pair.bgPath}"`);
     }
 
-    const bgOpaque = resolveOpaqueBg(bgColor);
+    let bgOpaque: OpaqueColor;
+    if (isOpaque(bgColor)) {
+      bgOpaque = bgColor;
+    } else {
+      if (!pair.compositeSurface || !pair.compositeSurfaceReason) {
+        throw new Error(
+          `Pair "${pair.id}" has alpha-carrying background "${pair.bgPath}" (alpha=${bgColor.alpha}) but does not declare compositeSurface and compositeSurfaceReason.`
+        );
+      }
+      const surfaceColor = colorMap.get(pair.compositeSurface);
+      if (!surfaceColor) {
+        throw new Error(
+          `Missing leaf color for compositeSurface "${pair.compositeSurface}" in pair "${pair.id}"`
+        );
+      }
+      if (!isOpaque(surfaceColor)) {
+        throw new Error(
+          `compositeSurface "${pair.compositeSurface}" for pair "${pair.id}" is not opaque (alpha=${surfaceColor.alpha})`
+        );
+      }
+      bgOpaque = composite(bgColor, surfaceColor);
+    }
     const fgOpaque = resolveOpaqueFg(fgColor, bgOpaque);
 
     const rawRatio = contrastRatio(fgOpaque, bgOpaque);
@@ -898,8 +920,18 @@ export function evaluateContrastGate(
       throw new Error(`Missing leaf color for tokenB "${rule.tokenB}"`);
     }
 
-    const opaqueA = resolveOpaqueBg(colorA);
-    const opaqueB = resolveOpaqueBg(colorB);
+    if (!isOpaque(colorA)) {
+      throw new Error(
+        `Separation rule "${rule.id}" tokenA "${rule.tokenA}" carries alpha (${colorA.alpha}) without a surface.`
+      );
+    }
+    if (!isOpaque(colorB)) {
+      throw new Error(
+        `Separation rule "${rule.id}" tokenB "${rule.tokenB}" carries alpha (${colorB.alpha}) without a surface.`
+      );
+    }
+    const opaqueA = colorA;
+    const opaqueB = colorB;
 
     const rawRatio = contrastRatio(opaqueA, opaqueB);
     const measuredRatio = Math.round(rawRatio * 100) / 100;

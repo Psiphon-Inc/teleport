@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { contrastRatio } from './color';
+import { composite, contrastRatio } from './color';
 import {
   CONTRAST_PAIRS,
   EXCLUDED_GROUPS,
@@ -356,5 +356,70 @@ describe('psiphonContrast / pairs', () => {
     expect(lowMed).toBeGreaterThan(1.3);
     const measuredMargin = lowMed - 1.3;
     expect(measuredMargin).toBeGreaterThan(0.09);
+  });
+
+  it('AC4 (ref-ve9h): every pair whose background carries alpha declares compositeSurface and compositeSurfaceReason', () => {
+    const alphaBgPairs = CONTRAST_PAIRS.filter(pair => {
+      const bgLeaf = resolvedLeaves.find(l => l.path === pair.bgPath);
+      return bgLeaf && bgLeaf.color.alpha < 1;
+    });
+
+    expect(alphaBgPairs.length).toBeGreaterThan(0);
+
+    for (const pair of alphaBgPairs) {
+      expect(typeof pair.compositeSurface).toBe('string');
+      expect(pair.compositeSurface!.length).toBeGreaterThan(0);
+      expect(typeof pair.compositeSurfaceReason).toBe('string');
+      expect(pair.compositeSurfaceReason!.length).toBeGreaterThan(0);
+
+      // Verify compositeSurface points to a valid opaque theme leaf
+      const surfaceLeaf = resolvedLeaves.find(
+        l => l.path === pair.compositeSurface
+      );
+      expect(surfaceLeaf).toBeDefined();
+      expect(surfaceLeaf!.color.alpha).toBe(1);
+    }
+  });
+
+  it('AC4 (ref-ve9h): a pair that fell back to levels.deep really is measured at its worst', () => {
+    // levels.deep is the darkest surface, so it is the conservative choice for
+    // DARK ink. It is the optimistic choice for LIGHT ink, because compositing
+    // an alpha background over a darker surface RAISES the ratio for a light
+    // foreground. Every alpha-background pair in the manifest is dark ink today,
+    // so the fallback holds. This test stops a future light-ink pair from
+    // inheriting the fallback and silently reopening the defect ref-ve9h fixed.
+    //
+    // Pairs that name a reader's surface instead are exempt by construction:
+    // their surface is a fact about the interface, not a worst-case guess.
+    const surfaces = resolvedLeaves.filter(
+      l => l.group === 'levels' && l.color.alpha === 1
+    );
+    expect(surfaces.length).toBeGreaterThan(1);
+
+    const fallbackPairs = CONTRAST_PAIRS.filter(
+      pair => pair.compositeSurface === 'levels.deep'
+    );
+    expect(fallbackPairs.length).toBeGreaterThan(0);
+
+    for (const pair of fallbackPairs) {
+      const fgLeaf = resolvedLeaves.find(l => l.path === pair.fgPath);
+      const bgLeaf = resolvedLeaves.find(l => l.path === pair.bgPath);
+      expect(fgLeaf).toBeDefined();
+      expect(bgLeaf).toBeDefined();
+
+      const ratioOver = (surface: (typeof surfaces)[number]) => {
+        const bg = composite(bgLeaf!.color, surface.color);
+        const fg = composite(fgLeaf!.color, bg);
+        return contrastRatio(fg, bg);
+      };
+
+      const deep = surfaces.find(l => l.path === 'levels.deep');
+      expect(deep).toBeDefined();
+      const worst = Math.min(...surfaces.map(ratioOver));
+
+      // Two decimals, because the report states ratios to two decimals and a
+      // difference below that is not something a reviewer can act on.
+      expect(ratioOver(deep!)).toBeCloseTo(worst, 2);
+    }
   });
 });

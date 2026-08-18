@@ -52,6 +52,10 @@ export interface ContrastPair {
   readonly deferred?: boolean;
   /** Reason for deferral */
   readonly deferredReason?: string;
+  /** Surface token path that an alpha-carrying background composites over */
+  readonly compositeSurface?: string;
+  /** Stated reason for why this composite surface applies (reader citation or worst plausible surface statement) */
+  readonly compositeSurfaceReason?: string;
 }
 
 /**
@@ -432,6 +436,9 @@ function buildContrastPairs(): ContrastPair[] {
         floor: 4.5,
         kind: 'normalText',
         floorReason: `WCAG 2.1 AA 1.4.3 text label on tonal ${family} step ${step} fill`,
+        compositeSurface: 'levels.deep',
+        compositeSurfaceReason:
+          'No reader is known; chosen worst plausible surface levels.deep',
       });
     }
   }
@@ -485,6 +492,9 @@ function buildContrastPairs(): ContrastPair[] {
       floor: 4.5,
       kind: 'normalText',
       floorReason: `WCAG 2.1 AA 1.4.3 secondary button label on ${state} fill`,
+      compositeSurface: 'levels.deep',
+      compositeSurfaceReason:
+        'No reader is known; chosen worst plausible surface levels.deep',
     });
 
     pairs.push({
@@ -560,6 +570,9 @@ function buildContrastPairs(): ContrastPair[] {
     floor: 4.5,
     kind: 'normalText',
     floorReason: 'WCAG 2.1 AA 1.4.3 trash button label on default fill',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   pairs.push({
@@ -569,6 +582,9 @@ function buildContrastPairs(): ContrastPair[] {
     floor: 4.5,
     kind: 'normalText',
     floorReason: 'WCAG 2.1 AA 1.4.3 trash button label on hover fill',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   for (const state of ['default', 'hover', 'active'] as const) {
@@ -713,6 +729,9 @@ function buildContrastPairs(): ContrastPair[] {
       floor: 4.5,
       kind: 'normalText',
       floorReason: `WCAG 2.1 AA 1.4.3 text on spot background ${spot}`,
+      compositeSurface: 'levels.deep',
+      compositeSurfaceReason:
+        'No reader is known; chosen worst plausible surface levels.deep',
     });
   }
 
@@ -725,6 +744,9 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'nonText',
     floorReason:
       'WCAG 2.1 AA 1.4.11 session recording progress fill against track background per D15',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   pairs.push({
@@ -818,6 +840,9 @@ function buildContrastPairs(): ContrastPair[] {
     floor: 4.5,
     kind: 'normalText',
     floorReason: 'WCAG 2.1 AA 1.4.3 inactivity event text floor per D18',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   pairs.push({
@@ -845,6 +870,9 @@ function buildContrastPairs(): ContrastPair[] {
     floor: 4.5,
     kind: 'normalText',
     floorReason: 'WCAG 2.1 AA 1.4.3 default event text floor',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   pairs.push({
@@ -898,6 +926,9 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'normalText',
     floorReason:
       'web/packages/design/src/Label/Label.tsx:140,142 outline-warning label text',
+    compositeSurface: 'levels.surface',
+    compositeSurfaceReason:
+      'web/packages/design/src/Label/Label.tsx:140,142 outline-warning label renders on page surface levels.surface',
   });
 
   pairs.push({
@@ -908,6 +939,9 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'normalText',
     floorReason:
       'web/packages/design/src/Label/Label.tsx:157 outline-danger label text',
+    compositeSurface: 'levels.surface',
+    compositeSurfaceReason:
+      'web/packages/design/src/Label/Label.tsx:157 outline-danger label renders on page surface levels.surface',
   });
 
   // 12b. ManagedUpdates/shared.tsx ProgressBar fills (non-text fill floor 3)
@@ -919,6 +953,9 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'nonText',
     floorReason:
       'web/packages/teleport/src/ManagedUpdates/shared.tsx:264 ProgressBar fill on tonal neutral',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   pairs.push({
@@ -929,6 +966,9 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'nonText',
     floorReason:
       'web/packages/teleport/src/ManagedUpdates/shared.tsx:259 ProgressBar fill on tonal neutral',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   // 12c. StatusColors.ts status accents (non-text border/icon floor 3 on tonal bg & plain surface)
@@ -940,6 +980,9 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'nonText',
     floorReason:
       'web/packages/design/src/Status/statusColors.ts:67,88-112 primary status border/icon on tonal primary',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   pairs.push({
@@ -960,6 +1003,9 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'nonText',
     floorReason:
       'web/packages/design/src/Status/statusColors.ts:52,88-112 info status border/icon on tonal informational',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   pairs.push({
@@ -980,6 +1026,9 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'nonText',
     floorReason:
       'web/packages/design/src/Status/statusColors.ts:46,88-112 warning status border/icon on tonal alert',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   pairs.push({
@@ -1000,6 +1049,9 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'nonText',
     floorReason:
       'web/packages/design/src/Status/statusColors.ts:40,88-112 success status border/icon on tonal success',
+    compositeSurface: 'levels.deep',
+    compositeSurfaceReason:
+      'No reader is known; chosen worst plausible surface levels.deep',
   });
 
   pairs.push({
