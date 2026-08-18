@@ -15,6 +15,7 @@ measurement, which the root `README.md` explains. The rest of the fork lives in
 
 | Document | Kind | Status |
 |---|---|---|
+| [`design/2026-08-18-contrast-baseline.md`](design/2026-08-18-contrast-baseline.md) | Design | **Current.** Recorded contrast and separation baseline for the inherited Teleport theme measured against commit ddefc7b22c5. |
 | [`design/2026-08-17-theme-token-mapping.md`](design/2026-08-17-theme-token-mapping.md) | Design | **Partial.** The theme contract. 18 of 21 role groups decided, 124 of 174 tokens, each with a measured contrast ratio. The implementations follow it and add nothing to it. |
 | [`design/2026-08-17-psiphon-primitive-inventory.md`](design/2026-08-17-psiphon-primitive-inventory.md) | Design | Current. What the Psiphon design language defines, with a source line for every value. An inventory, not a mapping. Read it before touching the theme. |
 | [`design/2026-08-08-minimal-divergence.md`](design/2026-08-08-minimal-divergence.md) | Design | Implemented. Read this first. It explains why the fork is shaped the way it is, and lists where the shipped code differs from the plan. |
