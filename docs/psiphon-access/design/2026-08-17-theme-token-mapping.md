@@ -1,8 +1,9 @@
 # Psiphon Access theme token mapping
 
-**Status: PARTIAL. 18 of 21 role groups decided, 124 of 174 leaf tokens.** Light
-values only. Every decision below was approved by the operator on 2026-08-17. The
-remaining groups are listed at the end and are not started.
+**Status: COMPLETE for ref-rvu4.1 scope. 21 of 21 role groups decided, 174 of 174 leaves** (145 mapped, with terminal 23 and editor 6 deferred to ref-rvu4.2). Light
+values only. The operator approved D1 to D18 on 2026-08-17. The operator
+delegated the four remaining colour choices on 2026-08-18, and D19 to D28 were
+made under that delegation and are reversible.
 
 This document is the contract the theme implementations follow. `ref-rvu4.6`
 implements the Chakra config from it. Nothing implements a colour that is not in
@@ -247,6 +248,46 @@ tint and measured 3.12:1; it becomes pure black at 11.42:1.
 The general rule: a label on a coloured chip is opaque. Translucency saves nothing
 and costs legibility.
 
+### D19. The dataVisualisation tier structure is vestigial
+
+13 of the 21 leaves have no reader in web/packages. Only caribbean and picton survive in more than one live tier. No three-tier ramp remains to protect. Each live leaf takes the value its role demands. Preserve the tier lightness ordering where it costs nothing. Never distort a brand-sourced value to satisfy a derived constraint.
+
+### D20. tertiary.caribbean uses the app success green
+
+Role: status success accent border and icon, plus LatencyDiagnostic Ok text. Value: `#03830E`, from the app success primitive. Contrast: 3.22:1 on interactive.tonal.success.1 against a 3:1 non-text floor, 4.77:1 on levels.surface, 4.93:1 on levels.elevated against a 4.5:1 text floor.
+
+### D21. tertiary.sunflower uses the D11 warning ink
+
+Role: status warning accent border and icon, plus LatencyDiagnostic Error text. Value: `#996700`, from D11. Contrast: 3.54:1 on interactive.tonal.alert.2 against a 3:1 non-text floor, 4.73:1 on levels.surface, 4.89:1 on levels.elevated against a 4.5:1 text floor.
+
+### D22. tertiary.purple uses pure black from D1
+
+Role: status primary accent border and icon. Value: `#000000`, following D1. Contrast: 14.66:1 on interactive.tonal.primary.0, 20.31:1 on levels.surface against a 3:1 floor.
+
+### D23. tertiary.abbey uses the app failure red
+
+Role: outline-danger label text in Label.tsx, plus LatencyDiagnostic Warn text. Value: `#860A14`, from the app failure primitive. Contrast: 8.47:1 on interactive.tonal.danger.0, 10.16:1 on levels.elevated against a 4.5:1 text floor.
+
+### D24. picton steps move to active and hover steps of the blue ramp
+
+Role: tertiary.picton is info status accent border and icon. secondary.picton is ProgressBar fill in ManagedUpdates/shared.tsx. D8 default `#0073BA` measures 3.00:1 on interactive.tonal.informational.2 and sits on the floor limit. Assign tertiary.picton to the active step `#004570`. It measures 5.98:1 on interactive.tonal.informational.2 and 9.74:1 on levels.surface. Assign secondary.picton to the hover step `#005C95`. It measures 3.84:1 on the worst-case track interactive.tonal.neutral.2 against a 3:1 floor. This preserves tier lightness ordering because secondary is lighter than tertiary. It costs nothing because D8 blue is a kept Teleport value.
+
+### D25. primary.sunflower moves to the D11 hover step for label text
+
+Role: outline-warning label text in Label.tsx. Main warning ink `#996700` measures 4.43:1 on interactive.tonal.alert.0 and fails the 4.5:1 text floor. Assign primary.sunflower to the D11 hover step `#7A5200`. It measures 6.27:1 on interactive.tonal.alert.0 and passes. A colour can be legible as a fill and illegible as text.
+
+### D26. secondary.caribbean uses the 0.8 scaled success step
+
+Role: ProgressBar fill in ManagedUpdates/shared.tsx. Value: `#02690B`, the app success green scaled by 0.8. Contrast: 3.76:1 on the worst-case track interactive.tonal.neutral.2 against a 3:1 floor. Tier ordering is deliberately not preserved here. Preserving it would mean darkening tertiary.caribbean purely to sit below secondary.caribbean. That choice would distort a brand-sourced value to satisfy a derived constraint. Record this lightness inversion between secondary and tertiary caribbean.
+
+### D27. The 13 dead dataVisualisation leaves keep Teleport values
+
+13 leaves have no live reader in shipped UI code. Author no value for a token nothing renders, following D14. All 13 keep Teleport values and are listed in EXCLUDED_LEAVES in `pairs.ts` with their evidence. Seven leaves serve teleterm, which this fork does not ship. Four leaves exist only in dark theme code branches. Two leaves have no reader anywhere in `web/packages`.
+
+### D28. LatencyDiagnostic.tsx maps worst latency to sunflower and middle to abbey
+
+`LatencyDiagnostic.tsx:42-51` maps the worst latency threshold to tertiary.sunflower and the middle threshold to tertiary.abbey. Error is the `l >= ERROR_THRESHOLD` branch. With these token assignments that renders amber for the worst state and red for the middle state. That mapping is inverted from visual convention. The fork preserves this component mapping and records it. Do not edit the component.
+
 ## The table
 
 `brand`, 1 leaf.
@@ -402,34 +443,50 @@ The small groups, 27 leaves.
 | `timeMarks.absolute` | `rgba(0,0,0,0.87)` | unchanged | already passes | 16.07:1 |
 | `timeMarks.text` | `rgba(0,0,0,0.87)` | unchanged | already passes | 16.07:1 |
 
+`dataVisualisation`, 21 leaves.
+
+| Token | Teleport now | Psiphon | Source | Measured |
+|---|---|---|---|---|
+| `dataVisualisation.primary.purple` | `#5531D4` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.primary.wednesdays` | `#A70DAF` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.primary.picton` | `#006BB8` | unchanged | D27, no reader | dead leaf, dark theme only |
+| `dataVisualisation.primary.sunflower` | `#8F5F00` | `#7A5200` | D25, D11 hover step | Label.tsx outline-warning text, 6.27:1 on alert.0 |
+| `dataVisualisation.primary.caribbean` | `#007562` | unchanged | D27, no reader | dead leaf, dark theme only |
+| `dataVisualisation.primary.abbey` | `#BF372E` | unchanged | D27, no reader | dead leaf, no reader |
+| `dataVisualisation.primary.cyan` | `#007282` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.secondary.purple` | `#6F4CED` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.secondary.wednesdays` | `#DC37E5` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.secondary.picton` | `#0089DE` | `#005C95` | D24, D8 hover step | ManagedUpdates/shared.tsx ProgressBar fill, 3.84:1 on neutral.2 |
+| `dataVisualisation.secondary.sunflower` | `#B27800` | unchanged | D27, no reader | dead leaf, no reader |
+| `dataVisualisation.secondary.caribbean` | `#009681` | `#02690B` | D26, 0.8 success scale | ManagedUpdates/shared.tsx ProgressBar fill, 3.76:1 on neutral.2 |
+| `dataVisualisation.secondary.abbey` | `#D4635B` | unchanged | D27, no reader | dead leaf, no reader |
+| `dataVisualisation.secondary.cyan` | `#1792A3` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.tertiary.purple` | `#3D1BB2` | `#000000` | D22, D1 black | statusColors.ts primary accent, 14.66:1 on primary.0, 20.31:1 on surface |
+| `dataVisualisation.tertiary.wednesdays` | `#690274` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.tertiary.picton` | `#004B89` | `#004570` | D24, D8 active step | statusColors.ts info accent, 5.98:1 on informational.2, 9.74:1 on surface |
+| `dataVisualisation.tertiary.sunflower` | `#704B00` | `#996700` | D21, D11 warning ink | statusColors.ts warning accent & LatencyDiagnostic Error text, 3.54:1 on alert.2, 4.73:1 on surface, 4.89:1 on elevated |
+| `dataVisualisation.tertiary.caribbean` | `#005742` | `#03830E` | D20, app success | statusColors.ts success accent & LatencyDiagnostic Ok text, 3.22:1 on success.1, 4.77:1 on surface, 4.93:1 on elevated |
+| `dataVisualisation.tertiary.abbey` | `#9D0A00` | `#860A14` | D23, app failure | Label.tsx outline-danger text & LatencyDiagnostic Warn text, 8.47:1 on danger.0, 10.16:1 on elevated |
+| `dataVisualisation.tertiary.cyan` | `#015C6E` | unchanged | D27, no reader | dead leaf, teleterm only |
+
 ## The change ratio, which `ref-rvu4.5` needs
 
-Of the 124 leaves decided so far, **64 change and 60 keep Teleport's value**, a 52
-percent change rate.
+Of the 145 leaves mapped across the 19 non-deferred role groups, **72 change and 73 keep Teleport's value**, so a fraction under half. The counts are exact and were taken leaf by leaf. Nothing was altered to move them.
 
-By batch: the first four groups ran 24 changed against 20 kept, `buttons` and the
-small groups ran 21 against 29, and the two session recording groups ran 19 against
-11. The recording groups change the most, because they inherit purple identifiers,
-an off-palette slate and four values that sat below their floors.
+By batch:
+- The first four groups (`brand`, `levels`, `text`, `interactive`): 24 changed against 20 kept across 44 leaves.
+- The `buttons` group and the small groups: 21 changed against 29 kept across 50 leaves.
+- The two session recording groups (`sessionRecording` and `sessionRecordingTimeline`): 19 changed against 11 kept across 30 leaves.
+- The `dataVisualisation` group: 8 changed (the 8 live leaves) against 13 kept (the 13 dead leaves with no live reader) across 21 leaves.
 
-Every figure here was counted leaf by leaf. An earlier estimate for the second batch
-said 41 changed and 53 kept across 94 leaves; the counted figure was 45 and 49, and
-nothing was altered to move toward the estimate.
+Across all 174 leaves in the theme (including the 29 deferred monospace leaves):
+- Decided/mapped: 145 leaves (72 changed, 73 kept).
+- Deferred to `ref-rvu4.2`: 29 leaves (`terminal` 23, `editor` 6).
+
+Every figure here was counted leaf by leaf.
 
 ## Groups not yet decided
 
-3 groups, 50 leaves: `terminal` 23, `dataVisualisation` 21, `editor` 6.
+2 groups, 29 leaves: `terminal` 23, `editor` 6.
 
-`terminal` and `editor`, 29 leaves, are deferred to `ref-rvu4.2`, which owns the
-monospace face and the ANSI palette.
-
-`dataVisualisation`, 21 leaves, is the only group left for this document, and it is
-deliberately last. It needs categorical hues, the brand supplies a gradient rather
-than categories, and the series must separate from each other as well as from the
-chart surface. Derive it inside the `ref-rvu4.4` gate so that pair separation and a
-colour vision check are machine-enforced.
-
-That recommendation is not a preference. Eyeballed hue separation failed twice while
-this document was written. `ref-rvu4.2` collapsed `cyan` and `br_cyan` onto one
-value, and D16 here collapsed the risk scale's low and medium to 1.01:1. A chart
-with 21 leaves offers far more chances to repeat it.
+`terminal` (23 leaves) and `editor` (6 leaves) are deferred to `ref-rvu4.2`, which owns the monospace face and the ANSI palette. All 21 role groups in the scope of `ref-rvu4.1` are decided and mapped.

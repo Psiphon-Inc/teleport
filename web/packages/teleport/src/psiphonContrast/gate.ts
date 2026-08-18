@@ -280,7 +280,7 @@ export const CONTRAST_BASELINE: readonly BaselineEntry[] = [
     tokenB: 'interactive.tonal.neutral.2',
     measuredRatio: 2.02,
     floor: 3,
-    decision: 'None',
+    decision: 'D24',
     reason:
       'ProgressBar fill secondary.picton #0089DE on tonal neutral 2 #D1D1D1 fails 3:1 non-text floor',
   },
@@ -290,7 +290,7 @@ export const CONTRAST_BASELINE: readonly BaselineEntry[] = [
     tokenB: 'interactive.tonal.neutral.2',
     measuredRatio: 2,
     floor: 3,
-    decision: 'None',
+    decision: 'D26',
     reason:
       'ProgressBar fill secondary.caribbean #009681 on tonal neutral 2 #D1D1D1 fails 3:1 non-text floor',
   },
