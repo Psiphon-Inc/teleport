@@ -96,7 +96,11 @@ Consequence: The Psiphon Access fork can author custom typography in its own the
 
 ## Section 4: Recommendation on numeric values
 
-Recommendation: Do not change any numeric font size value in `web/packages/design/src/theme/typography.ts`. Changing any Teleport font size value would alter component layouts across the user interface without a brand step mapping for 7 of the 11 sizes. [NEEDS OPERATOR APPROVAL]
+Recommendation: Do not change any numeric font size value in `web/packages/design/src/theme/typography.ts`. Changing any Teleport font size value would alter component layouts across the user interface without a brand step mapping for 7 of the 11 sizes.
+
+**APPROVED by the operator on 2026-08-19.** The approval covers every route to a numeric change, not only the named file. So the fork does not edit `typography.ts`, and it also does not override `fontSizes` or `typography` in `psiphonLegacyTheme`. Section 3 records that such an override is possible. This decision says the fork does not use it.
+
+The fork therefore takes the Psiphon type VOICE through the font family alone, and it keeps Teleport's type SIZES. `ref-rvu4.6.3` sets the families. A later issue may revisit the sizes, and it must amend this section rather than act around it.
 
 
 ## Source code changes and testing statement
