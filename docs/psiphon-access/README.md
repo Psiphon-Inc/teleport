@@ -27,6 +27,7 @@ measurement, which the root `README.md` explains. The rest of the fork lives in
 | [`adr/0003-author-a-full-token-set.md`](adr/0003-author-a-full-token-set.md) | Decision | Accepted. Why the fork authors a complete token set rather than merging values over Teleport config. |
 | [`adr/0004-bundle-inter-font-assets.md`](adr/0004-bundle-inter-font-assets.md) | Decision | Accepted. Why the fork bundles Inter font assets instead of referencing host fonts. |
 | [`adr/0005-terminal-rule-set.md`](adr/0005-terminal-rule-set.md) | Decision | Accepted. Terminal and editor theme rules governing structural slots, separation, font weights and CVD status. `ref-rvu4.2.2` and `ref-rvu4.2.3` derive values under it and may not add a rule. |
+| [`adr/0006-final-fork-names.md`](adr/0006-final-fork-names.md) | Decision | Accepted. Final names for the visual identity, product, and deployment. |
 | [`source-provenance.md`](source-provenance.md) | Licence record | Current. What this fork is built from, and how its notices work. |
 | [`runbook/google-oidc-first-deployment.md`](runbook/google-oidc-first-deployment.md) | Runbook | **History. Do not follow it.** It describes the replaced prototype. Rewrite tracked as ref-qnnq. |
 
