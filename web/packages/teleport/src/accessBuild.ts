@@ -26,10 +26,10 @@
 export const ACCESS_SOURCE_URL = 'https://github.com/Psiphon-Inc/teleport';
 
 /** ACCESS_REVISION is the full commit this build was made from. */
-export const ACCESS_REVISION = '9e89dbfd8d39a2a896cf13edbab2ef13c6e509b9';
+export const ACCESS_REVISION = '6896b29acbdc4d2f70b571b3ec00cc88e5eae153';
 
 /**
  * ACCESS_BUILD is the human-readable build label: the nearest tag, the short
  * commit, and a -dirty suffix when the tree had uncommitted changes.
  */
-export const ACCESS_BUILD = '9e89dbfd8d3';
+export const ACCESS_BUILD = '6896b29acbd';
