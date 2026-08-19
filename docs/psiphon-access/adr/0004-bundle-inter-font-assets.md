@@ -10,7 +10,9 @@ Should the Psiphon Access fork bundle Inter font assets into its web build, or s
 
 ## Decision
 
-The coordinator decided Option B on 2026-08-19 under the operator's instruction to complete `ref-rvu4.3`. The operator did not choose this option, so the decision is reversible. The fork bundles subsetted WOFF2 Inter font assets into the web UI build.
+The operator approved Option B on 2026-08-19. The fork bundles subsetted WOFF2 Inter font assets into the web UI build.
+
+The coordinator proposed the option first, under the instruction to complete `ref-rvu4.3`. The operator then read it and approved it.
 
 This decision selects an option. It ships no font file. Implementation belongs to `ref-rvu4.6` for the family stack and the `@font-face` rules, and to `ref-rvu4.8` for the build assets.
 
