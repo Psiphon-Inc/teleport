@@ -1,6 +1,8 @@
 # ADR 0005. Terminal and editor theme rules for Psiphon Access
 
-**Status: proposed, awaiting operator approval.**
+**Status: accepted, 2026-08-19.**
+
+The operator approved all seven rules on 2026-08-19, including the white pair exception in rule 1. The operator also settled `terminal.foreground` by accepting the recommendation in rule 3.
 
 
 ## Question
@@ -10,7 +12,9 @@ What rules must govern the re-derivation of terminal and editor theme tokens (`t
 
 ## Decision
 
-This issue proposes seven rules for operator approval to govern the re-derivation of terminal and editor theme tokens in Psiphon Access. This decision derives no colour values, writes no hex table, and computes no contrast ratios.
+Seven rules govern the re-derivation of terminal and editor theme tokens in Psiphon Access. The operator approved them on 2026-08-19. This decision derives no colour values and writes no hex table. It states a small number of measured ratios where a rule needs one as its reason.
+
+`ref-rvu4.2.2` derives every value under these rules. `ref-rvu4.2.3` proves the font metric behind rule 4. Neither may add a rule. If a rule is missing, they stop and report it.
 
 1. **The Separation Rule**: A minimum relative luminance ratio delta of 1.3:1 is required between each ANSI normal slot and its corresponding bright variant. On a light background, separation is achieved by moving the normal variant darker toward higher contrast while keeping the bright variant near the surface floor.
 
@@ -26,7 +30,7 @@ This issue proposes seven rules for operator approval to govern the re-derivatio
    - `terminal.brightBlack`: app grey `#5C5C5C` from decision D4 (`text.slightlyMuted` / `onSurfaceVariant`).
    - `terminal.white`: `levels.surface` (`#FFFFFF`) from decision D6.
    - `terminal.brightWhite`: `levels.sunken` (`#F7F7F7`) from decision D6.
-   - `terminal.foreground`: Put to the operator for decision with a recommendation. The proposal recommends `text.main` (`#000000`) from decision D1 over Selenized `fg_0` (`#53676d`). Decision D1 establishes black as the primary ink of the fork, removes a foreign value, and delivers maximum contrast (19.60:1) on `levels.sunken` (`#F7F7F7`). Selenized `fg_0` on the same decided background measures 5.56:1, not the 5.95:1 recorded in the parent issue notes, because that figure was measured against `#FFFFFF`. Both candidates clear the 4.5:1 text floor, so the choice is one of voice and provenance, not of legibility.
+   - `terminal.foreground`: `text.main` (`#000000`) from decision D1. The operator settled this on 2026-08-19, accepting the recommendation over Selenized `fg_0` (`#53676d`). Decision D1 establishes black as the primary ink of the fork, and taking it here removes a foreign value. It measures 19.60:1 on `levels.sunken` (`#F7F7F7`). The rejected candidate measures 5.56:1 on that same background, not the 5.95:1 recorded in the parent issue notes, because that figure was measured against `#FFFFFF`. Both candidates clear the 4.5:1 text floor, so the choice was one of voice and provenance, not of legibility.
 
 4. **The Bold Mapping**: Terminal bold text maps to font weight 500 (Medium). DM Mono ships Light 300, Regular 400, and Medium 500 (each with an italic) and carries no weight 700 (Bold). The fork never requests font weight 700 for the terminal face. This prevents browser synthetic bolding that distorts character metrics and breaks monospace grid alignment.
 
@@ -74,7 +78,7 @@ Option B establishes seven explicit rules grounded in numbered fork decisions D1
    - `terminal.brightBlack`: Sourced from decision D4 as `#5C5C5C` (app secondary text / `onSurfaceVariant`).
    - `terminal.white`: Sourced from decision D6 as `levels.surface` (`#FFFFFF`).
    - `terminal.brightWhite`: Sourced from decision D6 as `levels.sunken` (`#F7F7F7`).
-   - `terminal.foreground`: Presented to the operator with a recommendation. Candidate 1 is `text.main` (`#000000`) from decision D1. Candidate 2 is Selenized `fg_0` (`#53676d`). The proposal recommends `text.main` (`#000000`) because D1 makes black the primary ink of the fork, removes an external foreign value, and delivers 19.60:1 contrast on `levels.sunken` (`#F7F7F7`). Candidate 2 measures 5.56:1 on that same background. The 5.95:1 figure in the parent issue notes was measured against `#FFFFFF`, so it does not apply to the decided background. Both candidates clear the 4.5:1 text floor.
+   - `terminal.foreground`: decided as `text.main` (`#000000`) from decision D1. Candidate 2 was Selenized `fg_0` (`#53676d`). Candidate 1 won because D1 makes black the primary ink of the fork, and it removes an external foreign value. Candidate 1 measures 19.60:1 on `levels.sunken` (`#F7F7F7`) and candidate 2 measures 5.56:1 on the same background. The 5.95:1 figure in the parent issue notes was measured against `#FFFFFF`, so it does not apply to the decided background. Both candidates clear the 4.5:1 text floor.
 
 4. **Monospace Font Weight and Monospace Stack**:
    - DM Mono font assets ship Light 300, Regular 400, and Medium 500 weights (with italic variants) under the SIL Open Font License 1.1, with no weight 700 (Bold).
