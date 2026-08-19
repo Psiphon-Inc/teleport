@@ -119,8 +119,21 @@ them. The gate must be able to tell "deliberately unchanged" from "forgotten".
 
 ### File format
 
-The catalog is a TypeScript module, `brandCatalog.ts`, beside the gate. It
-exports a `readonly` array of typed records. This copies the house pattern in
+The catalog is TypeScript, beside the gate. It is ONE LOGICAL CATALOG HELD IN
+SEVERAL FILES. `brandCatalog.ts` holds the types and the aggregate export.
+`catalog/` holds seven leaf modules, one per UI area, and each leaf exports its
+own entries and its own dated baseline. The aggregator imports all seven and
+concatenates them.
+
+The first draft of this record said one physical module. That was corrected on
+2026-08-19, as amendment 2. A single 196-entry module puts every authoring
+child in one serial domain, which serialises the largest part of the work for
+no benefit. Seven leaves let four authoring children run in parallel on
+disjoint files. The cost is seven fixed imports in the aggregator, which the
+machinery child writes once and no authoring child touches.
+
+Each leaf exports a `readonly` array of typed records. This copies the house
+pattern in
 `web/packages/teleport/src/psiphonContrast/pairs.ts`, which declares
 `ContrastPair` at line 30 and exports typed `readonly` arrays such as
 `EXCLUDED_GROUPS` at line 91 and `EXCLUDED_LEAVES` at line 107.
@@ -135,8 +148,9 @@ Four reasons choose TypeScript over JSON, YAML or TOML.
    `${`, so the format bans template literals in the catalog.
 2. **The type system enforces the ban on patterns.** `source: string` cannot
    hold a `RegExp`. A JSON file cannot express that constraint at all.
-3. **One module serves both readers.** The vite plugin and the jest gate
-   import the same module. A data file would need a loader in two runtimes.
+3. **One aggregator serves both readers.** The vite plugin and the jest gate
+   import `brandCatalog.ts`, so both see the same seven leaves. A data file
+   would need a loader in two runtimes.
 4. **The house already does this.** A second format in the same tree costs a
    reader an extra thing to learn.
 
@@ -543,9 +557,17 @@ every `.ts` and `.tsx` file under `web/packages/teleport/src`,
    `immutable !== (replacement === source)`, when `tier === 'protocol'` and
    `immutable === false`, or when `reason` is empty.
 2. **Parse every file in the scan set** with the TypeScript parser at
-   `package.json:65`. Visit only string literals, template literal quasis and
-   JSX text nodes. Never visit an identifier, an import specifier, a JSX
-   attribute name or a comment. This removes the identifier hazard and the
+   `package.json:65`. Visit only string literals, whole template expressions
+   and JSX text nodes. Never visit an identifier, an import specifier, a JSX
+   attribute name or a comment.
+
+   A TEMPLATE IS VISITED WHOLE, NOT QUASI BY QUASI. This is amendment 1, made
+   on 2026-08-19. The first draft said to visit quasis, and that contradicts
+   worked examples E1 and E2, which both key on the complete template text
+   including the `${...}` spans. Reconstruct the whole template expression as
+   written, match the catalog source against that text, then rewrite only the
+   quasis. Never rewrite an expression span, because an expression holds code
+   and not copy. This removes the identifier hazard and the
    import-path hazard by structure, with no pattern anywhere.
 3. **Match the catalog** against each visited node. Sort entries longest
    source first. Compare a literal exactly. Normalise a JSX text node first.
@@ -781,6 +803,34 @@ template-literal expression and never a translation token.
   moved. The phrase is the catalog key, and the line number is not.
 - **An effort figure.** This record gives none. Any size figure for
   `ref-o74l.3` would be an estimate, and no measurement here supports one.
+
+
+## Corrections
+
+A planning pass for `ref-o74l.3` read this record within an hour of it being
+written and found four defects. The operator approved the first three on
+2026-08-19. They are applied above.
+
+1. **Template matching was internally inconsistent.** The algorithm said to
+   visit template quasis. Worked examples E1 and E2 key on the complete
+   template text. Corrected in "The algorithm".
+2. **One physical catalog module blocked parallel authoring.** Corrected in
+   "File format". One logical catalog now lives in seven leaf modules behind a
+   fixed aggregator.
+3. **`magic-string` is transitive only.** Measured on 2026-08-19 by grepping
+   every `package.json` in the tree, which found no direct declaration. A
+   direct import from the build package needs a declared dependency and a
+   lockfile change. `ref-o74l.3.1` owns that.
+
+A FOURTH PROPOSED CORRECTION WAS REJECTED, and the reason matters more than
+the correction. The planning pass argued that the catalog needs three immutable
+entries rather than five, because the two protocol headers sit in bucket D,
+which the rebrand excludes. That confuses two different questions. Bucket
+membership decides WHAT GETS REBRANDED. The catalog decides WHAT THE GATE CAN
+ACCOUNT FOR. The bundle layer scans the emitted bundle, it will meet
+`Teleport-Mfa-Response` and `X-Teleport-TokenName` there, and without an entry
+it cannot tell a header it must leave alone from a phrase somebody forgot. The
+catalog keeps all five immutable entries.
 
 
 ## Relationship to other records
