@@ -107,7 +107,7 @@ Three Go files are modified:
 - `lib/versioncontrol/github/github.go`
 - `tool/teleport/common/teleport.go`
 
-Seventeen further upstream files are modified. Measured on 2026-08-19 against
+Twenty-one further upstream files are modified. Measured on 2026-08-19 against
 the fork base `e0d3c67924a`.
 
 Branding and licence text:
@@ -126,6 +126,20 @@ Theme and terminal:
 - `web/packages/teleport/src/lib/term/terminal.ts`
 - `web/packages/teleport/src/SessionRecordings/view/player/tty/TtyPlayer.ts`
 - `web/packages/teleport/src/SessionRecordings/view/Xterm/Xterm.tsx`
+
+Build and tooling, for the brand catalog transform:
+
+- `web/packages/build/vite/config.ts`
+- `web/packages/teleport/package.json`
+- `tsconfig.node.json`
+- `pnpm-lock.yaml`
+
+ADR 0007 estimated that the build-time transform would modify ONE upstream
+file. It modifies four. The plugin registration is one line in the vite config.
+The other three follow from it: two declared dependencies, a lockfile importer
+entry, and five lines of `include` in the node tsconfig project. The estimate
+was low, and four is still far below the roughly 97 files that committed source
+edits would have modified. Record the measured number, not the estimate.
 
 Image assets:
 
@@ -153,7 +167,7 @@ git diff --name-status e0d3c67924a..HEAD \
   | grep -v 'lib/googleoidc\|tool/teleport-google\|docs/psiphon-access'
 ```
 
-It must print the three Go files and the seventeen files above, and nothing
+It must print the three Go files and the twenty-one files above, and nothing
 else. The number is not a cap. The fork keeps the modified upstream surface
 small as a goal, and the root `README.md` states how an addition is justified.
 
