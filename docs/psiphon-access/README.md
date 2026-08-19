@@ -16,6 +16,7 @@ measurement, which the root `README.md` explains. The rest of the fork lives in
 | Document | Kind | Status |
 |---|---|---|
 | [`design/2026-08-19-terminal-editor-values.md`](design/2026-08-19-terminal-editor-values.md) | Design | **Current.** Authoritative contract for the 23 terminal leaves and 6 editor leaves, derived under ADR 0005. |
+| [`design/2026-08-19-dm-mono-metrics.md`](design/2026-08-19-dm-mono-metrics.md) | Design | **Current.** Proof that the DM Mono grid holds when bold maps to Medium 500, with the metric measurements, the xterm.js contract and the licence finding. |
 | [`design/2026-08-18-contrast-baseline.md`](design/2026-08-18-contrast-baseline.md) | Design | **Current.** Recorded contrast and separation baseline for the inherited Teleport theme measured against commit ddefc7b22c5. |
 | [`design/2026-08-17-theme-token-mapping.md`](design/2026-08-17-theme-token-mapping.md) | Design | **Current.** The theme contract. All 21 role groups decided, 174 of 174 tokens, each with a measured contrast ratio. The implementations follow it and add nothing to it. |
 | [`design/2026-08-17-psiphon-primitive-inventory.md`](design/2026-08-17-psiphon-primitive-inventory.md) | Design | Current. What the Psiphon design language defines, with a source line for every value. An inventory, not a mapping. Read it before touching the theme. |
