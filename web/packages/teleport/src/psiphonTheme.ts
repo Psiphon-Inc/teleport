@@ -31,13 +31,10 @@ export const PSIPHON_THEME_NAME = 'psiphon';
 /**
  * psiphonUiTheme is the modern, Chakra-based theme.
  *
- * It borrows MC_THEME's config rather than authoring a new Chakra SystemConfig.
- * MC_THEME is itself TELEPORT_THEME.config with the colour mode forced to light,
- * so this inherits a configuration that is known to be valid and complete, and
- * changes only the name. Authoring the Psiphon token set properly means
- * rewriting that config against the --_psix-* tokens: accent #D95F33, pure white
- * surface, pure black text and borders, and the Inter typeface. That is a design
- * exercise rather than a rename, so it is deliberately not attempted here.
+ * The theme currently borrows MC_THEME's config, which is a placeholder. The
+ * authored token set is decided in ADR 0003, and ref-rvu4.6 implements it. The
+ * source of truth for token values is
+ * docs/psiphon-access/design/2026-08-17-theme-token-mapping.md and NOT psix.
  *
  * Forcing light is not a placeholder. The Psiphon visual language is a light,
  * high-contrast one, and a half-branded dark mode would look like a defect.

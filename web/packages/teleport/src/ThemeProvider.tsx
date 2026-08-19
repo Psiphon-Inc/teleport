@@ -54,10 +54,13 @@ const customThemes = {
 
 // FORK ADDITION. THEMES is a hardcoded array inside @gravitational/design-system,
 // which is installed from a release tarball rather than a workspace, so a theme
-// cannot be added to it without forking a second repository. Consulting a
-// fork-owned list first is the cheapest alternative: it keeps the theme itself
-// out of upstream files and confines the change here. This file has taken 5
-// upstream commits in two years, so it is a cheap place to carry a patch.
+// cannot be added to it without forking a second repository. That limitation
+// applies to registering a theme, but does not apply to authoring one, because
+// UiTheme.config is a plain Chakra SystemConfig, so the fork authors its tokens
+// entirely in this repository. Consulting a fork-owned list first is the cheapest
+// alternative: it keeps the theme itself out of upstream files and confines the
+// change here. This file has taken 5 upstream commits in two years, so it is a
+// cheap place to carry a patch.
 const forkThemes = [psiphonUiTheme];
 
 export function ThemeProvider({ children }: PropsWithChildren) {

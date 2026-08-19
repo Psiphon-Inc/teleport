@@ -21,6 +21,7 @@ measurement, which the root `README.md` explains. The rest of the fork lives in
 | [`design/2026-08-08-minimal-divergence.md`](design/2026-08-08-minimal-divergence.md) | Design | Implemented. Read this first. It explains why the fork is shaped the way it is, and lists where the shipped code differs from the plan. |
 | [`adr/0001-prefer-the-oidc-connector-model.md`](adr/0001-prefer-the-oidc-connector-model.md) | Decision | Accepted. Why the fork reuses the upstream OIDC connector instead of cloning the GitHub connector. Supporting text is historical. |
 | [`adr/0002-oidc-runtime-scope-and-approach.md`](adr/0002-oidc-runtime-scope-and-approach.md) | Decision | Accepted. Why browser and CLI login ship together and admin UI does not. Supporting text is historical. |
+| [`adr/0003-author-a-full-token-set.md`](adr/0003-author-a-full-token-set.md) | Decision | Accepted. Why the fork authors a complete token set rather than merging values over Teleport config. |
 | [`source-provenance.md`](source-provenance.md) | Licence record | Current. What this fork is built from, and how its notices work. |
 | [`runbook/google-oidc-first-deployment.md`](runbook/google-oidc-first-deployment.md) | Runbook | **History. Do not follow it.** It describes the replaced prototype. Rewrite tracked as ref-qnnq. |
 
