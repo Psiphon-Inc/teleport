@@ -227,7 +227,7 @@ function LicenseAcknowledgement({
         </ButtonPrimary>
       </LicenseBox>
       <Footer>
-        <Text>©Gravitational, Inc. All Rights Reserved</Text>
+        <Text>© Psiphon Inc. Portions © Gravitational, Inc.</Text>
         <FooterLink
           as="a"
           href="https://goteleport.com/legal/tos/"

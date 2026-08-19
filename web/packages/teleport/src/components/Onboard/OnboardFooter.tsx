@@ -24,7 +24,7 @@ export const OnboardFooter = () => {
   return (
     <StyledFooter>
       <StyledContent>
-        <Text>&copy; Gravitational, Inc. All Rights Reserved</Text>
+        <Text>&copy; Psiphon Inc. Portions &copy; Gravitational, Inc.</Text>
         <StyledLink href={'https://goteleport.com/legal/tos/'} target="_blank">
           Terms of Service
         </StyledLink>

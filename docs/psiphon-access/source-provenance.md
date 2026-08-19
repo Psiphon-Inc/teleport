@@ -89,10 +89,12 @@ Three Go files are modified:
 - `lib/versioncontrol/github/github.go`
 - `tool/teleport/common/teleport.go`
 
-Nine further upstream files are modified for branding and licence text:
+Eleven further upstream files are modified for branding and licence text:
 
 - `README.md`
 - `web/packages/teleport/src/Login/Login.tsx`
+- `web/packages/teleport/src/components/Onboard/OnboardFooter.tsx`
+- `web/packages/teleport/src/components/Onboard/OnboardFooter.test.tsx`
 - `web/packages/teleport/src/ThemeProvider.tsx`
 - `web/packages/design/src/assets/images/agpl-dark.svg`
 - `web/packages/design/src/assets/images/agpl-light.svg`
@@ -113,6 +115,20 @@ git diff --name-only upstream/master -- '*.go' ':!lib/googleoidc' ':!tool/telepo
 It must list those three files and nothing else. The number is not a cap. The
 fork keeps the modified upstream surface small as a goal, and the root
 `README.md` states how an addition is justified.
+
+## Rendered service footers
+
+Recorded on 2026-08-19.
+
+AGPL sections 4 and 5 govern source-level copyright and licence notices. This
+fork preserves those notices in each modified upstream file. That duty is
+separate from the footer rendered by the modified network service.
+
+The affected footers now read `© Psiphon Inc. Portions © Gravitational, Inc.`.
+The pre-authentication page keeps the fork notice discussed in AGPL section
+5(a). It also keeps the Corresponding Source offer discussed in section 13.
+
+This is not legal advice.
 
 ## Meeting AGPL section 13
 

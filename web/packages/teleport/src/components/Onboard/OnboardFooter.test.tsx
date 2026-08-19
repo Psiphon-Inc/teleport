@@ -24,7 +24,7 @@ test('renders RR, TOS, and PP', () => {
   render(<OnboardFooter />);
 
   expect(
-    screen.getByText(/Gravitational, Inc. All Rights Reserved/i)
+    screen.getByText(/© Psiphon Inc. Portions © Gravitational, Inc./i)
   ).toBeInTheDocument();
   expect(
     screen.getByRole('link', { name: /Terms of Service/i })
