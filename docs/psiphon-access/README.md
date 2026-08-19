@@ -28,6 +28,7 @@ measurement, which the root `README.md` explains. The rest of the fork lives in
 | [`adr/0004-bundle-inter-font-assets.md`](adr/0004-bundle-inter-font-assets.md) | Decision | Accepted. Why the fork bundles Inter font assets instead of referencing host fonts. |
 | [`adr/0005-terminal-rule-set.md`](adr/0005-terminal-rule-set.md) | Decision | Accepted. Terminal and editor theme rules governing structural slots, separation, font weights and CVD status. `ref-rvu4.2.2` and `ref-rvu4.2.3` derive values under it and may not add a rule. |
 | [`adr/0006-final-fork-names.md`](adr/0006-final-fork-names.md) | Decision | Accepted. Final names for the visual identity, product, and deployment. |
+| [`adr/0007-content-keyed-brand-catalog.md`](adr/0007-content-keyed-brand-catalog.md) | Decision | Part accepted, part proposed. The catalog format, the tier rules and the failing gate for the 196 reachable `Teleport` phrases. The operator must still choose between a build-time transform and committed source edits. `ref-o74l.3` implements it. |
 | [`source-provenance.md`](source-provenance.md) | Licence record | Current. What this fork is built from, and how its notices work. |
 | [`runbook/google-oidc-first-deployment.md`](runbook/google-oidc-first-deployment.md) | Runbook | **History. Do not follow it.** It describes the replaced prototype. Rewrite tracked as ref-qnnq. |
 
