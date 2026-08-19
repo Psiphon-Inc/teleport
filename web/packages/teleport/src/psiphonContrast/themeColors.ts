@@ -25,6 +25,7 @@ export interface ThemeColorLeaf {
   path: string;
   group: string;
   color: Color;
+  rawValue: string;
 }
 
 /**
@@ -237,6 +238,7 @@ export function getResolvedThemeColors(
         path: fullPath,
         group,
         color,
+        rawValue: rawLight,
       });
       return;
     }

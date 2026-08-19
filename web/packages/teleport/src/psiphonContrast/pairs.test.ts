@@ -19,6 +19,7 @@
 import { composite, contrastRatio } from './color';
 import {
   CONTRAST_PAIRS,
+  DEFERRED_REFERENCE_EDGES,
   EXCLUDED_GROUPS,
   EXCLUDED_LEAVES,
   SEPARATION_RULES,
@@ -203,18 +204,18 @@ describe('psiphonContrast / pairs', () => {
     expect(actionExclusion!.reason).toMatch(/D14/);
   });
 
-  it('ref-rvu4.1.2: dataVisualisation manifest reflects real reader usage, 13 dead leaves excluded, 8 live leaves paired with reader citations', () => {
-    // Exactly 13 leaves recorded as having no live reader
+  it('ref-f7e8: dataVisualisation manifest reflects 7 dead leaves and 6 theme-referenced leaves, 8 live leaves paired with reader citations', () => {
+    // Exactly 13 leaves excluded from component contrast pairs
     expect(EXCLUDED_LEAVES.length).toBe(13);
 
     const deadPaths = new Set(EXCLUDED_LEAVES.map(l => l.path));
     expect(deadPaths.size).toBe(13);
 
-    // Confirm specific 11 dead leaves in web/packages and 2 dark-theme branch dead leaves
+    // Confirm specific 7 dead leaves and 6 theme-referenced leaves
     expect(deadPaths.has('dataVisualisation.primary.purple')).toBe(true);
     expect(deadPaths.has('dataVisualisation.primary.wednesdays')).toBe(true);
-    expect(deadPaths.has('dataVisualisation.primary.picton')).toBe(true); // dark branch
-    expect(deadPaths.has('dataVisualisation.primary.caribbean')).toBe(true); // dark branch
+    expect(deadPaths.has('dataVisualisation.primary.picton')).toBe(true);
+    expect(deadPaths.has('dataVisualisation.primary.caribbean')).toBe(true);
     expect(deadPaths.has('dataVisualisation.primary.abbey')).toBe(true);
     expect(deadPaths.has('dataVisualisation.primary.cyan')).toBe(true);
     expect(deadPaths.has('dataVisualisation.secondary.purple')).toBe(true);
@@ -225,7 +226,22 @@ describe('psiphonContrast / pairs', () => {
     expect(deadPaths.has('dataVisualisation.tertiary.wednesdays')).toBe(true);
     expect(deadPaths.has('dataVisualisation.tertiary.cyan')).toBe(true);
 
-    // None of the 13 dead leaves carry an invented contrast pair
+    const themeRefLeaves = [
+      'dataVisualisation.primary.purple',
+      'dataVisualisation.primary.picton',
+      'dataVisualisation.primary.caribbean',
+      'dataVisualisation.primary.abbey',
+      'dataVisualisation.primary.cyan',
+      'dataVisualisation.tertiary.cyan',
+    ];
+
+    for (const path of themeRefLeaves) {
+      const leaf = EXCLUDED_LEAVES.find(l => l.path === path);
+      expect(leaf).toBeDefined();
+      expect(leaf!.reason).toMatch(/Referenced by (terminal|editor)/);
+    }
+
+    // None of the 13 excluded leaves carry an invented component contrast pair
     const deadPairs = CONTRAST_PAIRS.filter(p => deadPaths.has(p.fgPath));
     expect(deadPairs).toEqual([]);
 
@@ -282,6 +298,30 @@ describe('psiphonContrast / pairs', () => {
     for (const p of statusSurfacePairs) {
       expect(p.floorReason).toContain('statusColors.ts:88-112');
     }
+  });
+
+  it('ref-f7e8: DEFERRED_REFERENCE_EDGES declares all 20 reference edges from terminal and editor', () => {
+    expect(DEFERRED_REFERENCE_EDGES.length).toBe(20);
+
+    const terminalEdges = DEFERRED_REFERENCE_EDGES.filter(e =>
+      e.deferredPath.startsWith('terminal.')
+    );
+    expect(terminalEdges.length).toBe(14);
+
+    const editorEdges = DEFERRED_REFERENCE_EDGES.filter(e =>
+      e.deferredPath.startsWith('editor.')
+    );
+    expect(editorEdges.length).toBe(6);
+
+    // Verify terminal.magenta references dataVisualisation.tertiary.purple with decision D22
+    const magentaEdge = DEFERRED_REFERENCE_EDGES.find(
+      e => e.deferredPath === 'terminal.magenta'
+    );
+    expect(magentaEdge).toBeDefined();
+    expect(magentaEdge!.sourcePath).toBe('dataVisualisation.tertiary.purple');
+    expect(magentaEdge!.decision).toBe('D22');
+    expect(magentaEdge!.inheritedHex).toBe('#3D1BB2');
+    expect(magentaEdge!.decidedHex).toBe('#000000');
   });
 
   it('AC5: separation rules cover intra-tier dataVisualisation series (63 pairs: 3 tiers x 21 intra-tier pairs) and ANSI normal vs bright slots (8 pairs)', () => {

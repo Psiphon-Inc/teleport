@@ -23,6 +23,7 @@ import {
   formatContrastReport,
   type BaselineEntry,
 } from './gate';
+import { DEFERRED_REFERENCE_EDGES } from './pairs';
 
 describe('psiphonContrast gate', () => {
   it('evaluates contrast gate and prints full report', () => {
@@ -36,9 +37,11 @@ describe('psiphonContrast gate', () => {
     expect(evaluation.unhandledFailures).toEqual([]);
     expect(evaluation.ratchetFailures).toEqual([]);
     expect(evaluation.separationFailures).toEqual([]);
+    expect(evaluation.deferredReferenceFailures).toEqual([]);
     expect(evaluation.counts.fail).toBe(0);
     expect(evaluation.counts.ratchetFail).toBe(0);
     expect(evaluation.counts.separationFail).toBe(0);
+    expect(evaluation.counts.deferredEdgeFail).toBe(0);
 
     // Verify expected counts
     expect(evaluation.leafCount).toBe(174);
@@ -53,6 +56,9 @@ describe('psiphonContrast gate', () => {
     expect(evaluation.counts.separationPass).toBe(17);
     expect(evaluation.counts.separationBaseline).toBe(46);
     expect(evaluation.counts.separationDeferred).toBe(8);
+
+    expect(evaluation.counts.deferredEdgeTotal).toBe(20);
+    expect(evaluation.counts.deferredEdgePass).toBe(20);
   });
 
   it('fails with detailed message when a pair below floor is not in baseline', () => {
@@ -118,5 +124,30 @@ describe('psiphonContrast gate', () => {
     expect(weakenedFailure).toContain('fg=text.main');
     expect(weakenedFailure).toContain('bg=levels.surface');
     expect(weakenedFailure).toContain('floor 4.5:1');
+  });
+
+  it('proves deferred reference edge guard is not vacuous: mutating a declared entry produces a named failure', () => {
+    // Mutate terminal.red's declared inherited value from #9D0A00 to #000000
+    const mutatedEdges = DEFERRED_REFERENCE_EDGES.map(edge =>
+      edge.deferredPath === 'terminal.red'
+        ? { ...edge, inheritedHex: '#000000' }
+        : edge
+    );
+
+    const evaluation = evaluateContrastGate(
+      psiphonUiTheme,
+      CONTRAST_BASELINE,
+      mutatedEdges
+    );
+
+    expect(evaluation.deferredReferenceFailures.length).toBe(1);
+    const failureMsg = evaluation.deferredReferenceFailures[0];
+    expect(failureMsg).toContain('terminal.red');
+    expect(failureMsg).toContain(
+      'Deferred reference edge value moved for "terminal.red": measured resolved value #9D0A00 no longer matches declared inherited value #000000'
+    );
+    expect(failureMsg).toContain(
+      'moved by D23 decision on dataVisualisation.tertiary.abbey to #860A14'
+    );
   });
 });

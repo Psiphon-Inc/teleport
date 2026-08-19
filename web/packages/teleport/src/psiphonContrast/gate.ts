@@ -26,8 +26,10 @@ import {
 } from './color';
 import {
   CONTRAST_PAIRS,
+  DEFERRED_REFERENCE_EDGES,
   SEPARATION_RULES,
   type ContrastPair,
+  type DeferredReferenceEdge,
   type SeparationRule,
 } from './pairs';
 import { getResolvedThemeColors } from './themeColors';
@@ -753,13 +755,30 @@ export interface SeparationResult {
   readonly failureMessage?: string;
 }
 
+export type DeferredEdgeVerdict =
+  | 'PASS'
+  | 'MOVED_FAIL'
+  | 'ABSENT_FAIL'
+  | 'EXTRA_FAIL'
+  | 'MISMATCH_FAIL';
+
+export interface DeferredEdgeResult {
+  readonly edge: DeferredReferenceEdge;
+  readonly measuredSourcePath?: string;
+  readonly measuredInheritedHex?: string;
+  readonly verdict: DeferredEdgeVerdict;
+  readonly failureMessage?: string;
+}
+
 export interface GateEvaluation {
   readonly leafCount: number;
   readonly pairResults: PairResult[];
   readonly separationResults: SeparationResult[];
+  readonly deferredEdgeResults: DeferredEdgeResult[];
   readonly unhandledFailures: string[];
   readonly ratchetFailures: string[];
   readonly separationFailures: string[];
+  readonly deferredReferenceFailures: string[];
   readonly counts: {
     readonly totalLeaves: number;
     readonly totalPairs: number;
@@ -776,6 +795,9 @@ export interface GateEvaluation {
     readonly separationFail: number;
     readonly separationRatchetFail: number;
     readonly separationDeferred: number;
+    readonly deferredEdgeTotal: number;
+    readonly deferredEdgePass: number;
+    readonly deferredEdgeFail: number;
   };
 }
 
@@ -788,7 +810,8 @@ function resolveOpaqueFg(fgColor: Color, bgOpaque: OpaqueColor): OpaqueColor {
 
 export function evaluateContrastGate(
   theme?: any,
-  baseline: readonly BaselineEntry[] = CONTRAST_BASELINE
+  baseline: readonly BaselineEntry[] = CONTRAST_BASELINE,
+  declaredEdges: readonly DeferredReferenceEdge[] = DEFERRED_REFERENCE_EDGES
 ): GateEvaluation {
   const leaves = getResolvedThemeColors(theme);
   const colorMap = new Map<string, Color>();
@@ -982,13 +1005,115 @@ export function evaluateContrastGate(
     });
   }
 
+  // --- DEFERRED REFERENCE EDGE GUARD ---
+  const deferredEdgeResults: DeferredEdgeResult[] = [];
+  const deferredReferenceFailures: string[] = [];
+  let deferredEdgePass = 0;
+  let deferredEdgeFail = 0;
+
+  const themeEdgeMap = new Map<
+    string,
+    { deferredPath: string; sourcePath: string; inheritedHex: string }
+  >();
+
+  for (const leaf of leaves) {
+    if (leaf.rawValue) {
+      const match = /^\{colors\.([^}]+)\}$/.exec(leaf.rawValue.trim());
+      if (match) {
+        const sourcePath = match[1].trim();
+        const inheritedHex = toHex(leaf.color);
+        themeEdgeMap.set(leaf.path, {
+          deferredPath: leaf.path,
+          sourcePath,
+          inheritedHex,
+        });
+      }
+    }
+  }
+
+  const declaredMap = new Map<string, DeferredReferenceEdge>();
+  for (const edge of declaredEdges) {
+    declaredMap.set(edge.deferredPath, edge);
+  }
+
+  for (const edge of declaredEdges) {
+    const themeEdge = themeEdgeMap.get(edge.deferredPath);
+    if (!themeEdge) {
+      const failureMessage = `Declared deferred reference edge "${edge.deferredPath}" -> "${edge.sourcePath}" is absent from theme.`;
+      deferredReferenceFailures.push(failureMessage);
+      deferredEdgeFail++;
+      deferredEdgeResults.push({
+        edge,
+        verdict: 'ABSENT_FAIL',
+        failureMessage,
+      });
+    } else if (themeEdge.sourcePath !== edge.sourcePath) {
+      const failureMessage = `Deferred reference edge source mismatch for "${edge.deferredPath}": declared source "${edge.sourcePath}" but theme has "${themeEdge.sourcePath}".`;
+      deferredReferenceFailures.push(failureMessage);
+      deferredEdgeFail++;
+      deferredEdgeResults.push({
+        edge,
+        measuredSourcePath: themeEdge.sourcePath,
+        measuredInheritedHex: themeEdge.inheritedHex,
+        verdict: 'MISMATCH_FAIL',
+        failureMessage,
+      });
+    } else if (themeEdge.inheritedHex !== edge.inheritedHex) {
+      const failureMessage = `Deferred reference edge value moved for "${edge.deferredPath}": measured resolved value ${themeEdge.inheritedHex} no longer matches declared inherited value ${edge.inheritedHex} (moved by ${edge.decision} decision on ${edge.sourcePath} to ${edge.decidedHex}).`;
+      deferredReferenceFailures.push(failureMessage);
+      deferredEdgeFail++;
+      deferredEdgeResults.push({
+        edge,
+        measuredSourcePath: themeEdge.sourcePath,
+        measuredInheritedHex: themeEdge.inheritedHex,
+        verdict: 'MOVED_FAIL',
+        failureMessage,
+      });
+    } else {
+      deferredEdgePass++;
+      deferredEdgeResults.push({
+        edge,
+        measuredSourcePath: themeEdge.sourcePath,
+        measuredInheritedHex: themeEdge.inheritedHex,
+        verdict: 'PASS',
+      });
+    }
+  }
+
+  for (const [deferredPath, themeEdge] of themeEdgeMap) {
+    if (
+      (deferredPath.startsWith('terminal.') ||
+        deferredPath.startsWith('editor.')) &&
+      !declaredMap.has(deferredPath)
+    ) {
+      const failureMessage = `Undeclared deferred reference edge present in theme: "${deferredPath}" -> "${themeEdge.sourcePath}".`;
+      deferredReferenceFailures.push(failureMessage);
+      deferredEdgeFail++;
+      deferredEdgeResults.push({
+        edge: {
+          deferredPath,
+          sourcePath: themeEdge.sourcePath,
+          decision: 'None',
+          inheritedHex: themeEdge.inheritedHex,
+          decidedHex: themeEdge.inheritedHex,
+        },
+        measuredSourcePath: themeEdge.sourcePath,
+        measuredInheritedHex: themeEdge.inheritedHex,
+        verdict: 'EXTRA_FAIL',
+        failureMessage,
+      });
+    }
+  }
+
   return {
     leafCount: leaves.length,
     pairResults,
     separationResults,
+    deferredEdgeResults,
     unhandledFailures,
     ratchetFailures,
     separationFailures,
+    deferredReferenceFailures,
     counts: {
       totalLeaves: leaves.length,
       totalPairs: CONTRAST_PAIRS.length,
@@ -1005,6 +1130,9 @@ export function evaluateContrastGate(
       separationFail,
       separationRatchetFail,
       separationDeferred,
+      deferredEdgeTotal: declaredEdges.length,
+      deferredEdgePass,
+      deferredEdgeFail,
     },
   };
 }
@@ -1055,6 +1183,29 @@ export function formatContrastReport(evaluation: GateEvaluation): string {
         2
       )}:1 (minDelta: ${minDelta}:1)`
     );
+  }
+
+  lines.push('');
+  lines.push('--- DEFERRED REFERENCE EDGE RESULTS ---');
+  lines.push(
+    `Total Deferred Reference Edges: ${evaluation.counts.deferredEdgeTotal}`
+  );
+  lines.push(`  - PASS: ${evaluation.counts.deferredEdgePass}`);
+  lines.push(`  - FAIL: ${evaluation.counts.deferredEdgeFail}`);
+
+  for (const res of evaluation.deferredEdgeResults) {
+    const { edge, measuredInheritedHex, verdict, failureMessage } = res;
+    if (verdict === 'PASS') {
+      const decInfo =
+        edge.decision !== 'D27' && edge.decision !== 'None'
+          ? ` (${edge.decision} -> ${edge.decidedHex})`
+          : '';
+      lines.push(
+        `[PASS] ${edge.deferredPath}: ${edge.deferredPath} (${measuredInheritedHex}) -> ${edge.sourcePath}${decInfo}`
+      );
+    } else {
+      lines.push(`[${verdict}] ${edge.deferredPath}: ${failureMessage}`);
+    }
   }
 
   lines.push('====================================================');

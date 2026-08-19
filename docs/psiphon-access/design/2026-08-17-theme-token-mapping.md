@@ -290,9 +290,19 @@ Role: outline-warning label text in Label.tsx. Main warning ink `#996700` measur
 
 Role: ProgressBar fill in ManagedUpdates/shared.tsx. Value: `#02690B`, the app success green scaled by 0.8. Contrast: 3.76:1 on the worst-case track interactive.tonal.neutral.2 against a 3:1 floor. Tier ordering is deliberately not preserved here. Preserving it would mean darkening tertiary.caribbean purely to sit below secondary.caribbean. That choice would distort a brand-sourced value to satisfy a derived constraint. Record this lightness inversion between secondary and tertiary caribbean.
 
-### D27. The 13 dead dataVisualisation leaves keep Teleport values
+### D27. Seven dataVisualisation leaves have no reader and six serve theme references
 
-13 leaves have no live reader in shipped UI code. Author no value for a token nothing renders, following D14. All 13 keep Teleport values and are listed in EXCLUDED_LEAVES in `pairs.ts` with their evidence. Seven leaves serve teleterm, which this fork does not ship. Four leaves exist only in dark theme code branches. Two leaves have no reader anywhere in `web/packages`.
+Seven dataVisualisation leaves have no reader in shipped UI code. They keep inherited Teleport values. Six dataVisualisation leaves have no component reader, but the theme itself references them for terminal or editor. They also keep inherited Teleport values until ref-rvu4.2 decides terminal and editor. All 13 leaves are listed in `EXCLUDED_LEAVES` in `pairs.ts` with their evidence.
+
+The six leaves and their theme references are:
+- `primary.purple`: referenced by `terminal.brightMagenta`
+- `primary.abbey`: referenced by `terminal.brightRed`
+- `primary.cyan`: referenced by `terminal.brightCyan`
+- `primary.caribbean`: referenced by `terminal.brightGreen`
+- `primary.picton`: referenced by `terminal.brightBlue`
+- `tertiary.cyan`: referenced by `terminal.cyan` and `editor.cyan`
+
+The seven leaves with no reader are: `primary.wednesdays`, `secondary.purple`, `secondary.wednesdays`, `secondary.sunflower`, `secondary.abbey`, `secondary.cyan`, and `tertiary.wednesdays`.
 
 ### D28. LatencyDiagnostic.tsx maps worst latency to sunflower and middle to abbey
 
@@ -457,13 +467,13 @@ The small groups, 27 leaves.
 
 | Token | Teleport now | Psiphon | Source | Measured |
 |---|---|---|---|---|
-| `dataVisualisation.primary.purple` | `#5531D4` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.primary.purple` | `#5531D4` | unchanged | D27, theme reference | referenced by terminal.brightMagenta |
 | `dataVisualisation.primary.wednesdays` | `#A70DAF` | unchanged | D27, no reader | dead leaf, teleterm only |
-| `dataVisualisation.primary.picton` | `#006BB8` | unchanged | D27, no reader | dead leaf, dark theme only |
+| `dataVisualisation.primary.picton` | `#006BB8` | unchanged | D27, theme reference | referenced by terminal.brightBlue |
 | `dataVisualisation.primary.sunflower` | `#8F5F00` | `#7A5200` | D25, D11 hover step | Label.tsx outline-warning text, 6.27:1 on alert.0 |
-| `dataVisualisation.primary.caribbean` | `#007562` | unchanged | D27, no reader | dead leaf, dark theme only |
-| `dataVisualisation.primary.abbey` | `#BF372E` | unchanged | D27, no reader | dead leaf, no reader |
-| `dataVisualisation.primary.cyan` | `#007282` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.primary.caribbean` | `#007562` | unchanged | D27, theme reference | referenced by terminal.brightGreen |
+| `dataVisualisation.primary.abbey` | `#BF372E` | unchanged | D27, theme reference | referenced by terminal.brightRed |
+| `dataVisualisation.primary.cyan` | `#007282` | unchanged | D27, theme reference | referenced by terminal.brightCyan |
 | `dataVisualisation.secondary.purple` | `#6F4CED` | unchanged | D27, no reader | dead leaf, teleterm only |
 | `dataVisualisation.secondary.wednesdays` | `#DC37E5` | unchanged | D27, no reader | dead leaf, teleterm only |
 | `dataVisualisation.secondary.picton` | `#0089DE` | `#005C95` | D24, D8 hover step | ManagedUpdates/shared.tsx ProgressBar fill, 3.84:1 on neutral.2 |
@@ -477,7 +487,7 @@ The small groups, 27 leaves.
 | `dataVisualisation.tertiary.sunflower` | `#704B00` | `#996700` | D21, D11 warning ink | statusColors.ts warning accent & LatencyDiagnostic Error text, 3.54:1 on alert.2, 4.73:1 on surface, 4.89:1 on elevated |
 | `dataVisualisation.tertiary.caribbean` | `#005742` | `#03830E` | D20, app success | statusColors.ts success accent & LatencyDiagnostic Ok text, 3.22:1 on success.1, 4.77:1 on surface, 4.93:1 on elevated |
 | `dataVisualisation.tertiary.abbey` | `#9D0A00` | `#860A14` | D23, app failure | Label.tsx outline-danger text & LatencyDiagnostic Warn text, 8.47:1 on danger.0, 10.16:1 on elevated |
-| `dataVisualisation.tertiary.cyan` | `#015C6E` | unchanged | D27, no reader | dead leaf, teleterm only |
+| `dataVisualisation.tertiary.cyan` | `#015C6E` | unchanged | D27, theme reference | referenced by terminal.cyan & editor.cyan |
 
 ## The change ratio, which `ref-rvu4.5` needs
 
@@ -487,7 +497,7 @@ By batch:
 - The first four groups (`brand`, `levels`, `text`, `interactive`): 24 changed against 20 kept across 44 leaves.
 - The `buttons` group and the small groups: 21 changed against 29 kept across 50 leaves.
 - The two session recording groups (`sessionRecording` and `sessionRecordingTimeline`): 19 changed against 11 kept across 30 leaves.
-- The `dataVisualisation` group: 8 changed (the 8 live leaves) against 13 kept (the 13 dead leaves with no live reader) across 21 leaves.
+- The `dataVisualisation` group: 8 changed (the 8 leaves with a component reader) against 13 kept (7 leaves with no reader and 6 leaves that only the theme references) across 21 leaves.
 
 Across all 174 leaves in the theme (including the 29 deferred monospace leaves):
 - Decided/mapped: 145 leaves (72 changed, 73 kept).
@@ -500,3 +510,22 @@ Every figure here was counted leaf by leaf.
 2 groups, 29 leaves: `terminal` 23, `editor` 6.
 
 `terminal` (23 leaves) and `editor` (6 leaves) are deferred to `ref-rvu4.2`, which owns the monospace face and the ANSI palette. All 21 role groups in the scope of `ref-rvu4.1` are decided and mapped.
+
+### Inherited ANSI slot changes from dataVisualisation decisions
+
+The dataVisualisation decisions D20 to D25 change six ANSI slots through theme reference chains. The table below lists the affected ANSI slots, their inherited Teleport values, and the values given by dataVisualisation decisions:
+
+| ANSI slot | Source token | Decision | Inherited value | Decided value |
+|---|---|---|---|---|
+| `terminal.red` | `dataVisualisation.tertiary.abbey` | D23 | `#9D0A00` | `#860A14` |
+| `terminal.green` | `dataVisualisation.tertiary.caribbean` | D20 | `#005742` | `#03830E` |
+| `terminal.yellow` | `dataVisualisation.tertiary.sunflower` | D21 | `#704B00` | `#996700` |
+| `terminal.blue` | `dataVisualisation.tertiary.picton` | D24 | `#004B89` | `#004570` |
+| `terminal.magenta` | `dataVisualisation.tertiary.purple` | D22 | `#3D1BB2` | `#000000` |
+| `terminal.brightYellow` | `dataVisualisation.primary.sunflower` | D25 | `#8F5F00` | `#7A5200` |
+
+### Known defect for ref-rvu4.2: terminal.magenta collapse
+
+Decision D22 assigns `#000000` to `dataVisualisation.tertiary.purple` for status primary accent borders. Through the theme reference chain, `terminal.magenta` inherits `#000000`. This makes `terminal.magenta` identical to `terminal.black` (`#000000`).
+
+This pair collapse is a defect for `ref-rvu4.2` to resolve. Decision D22 stays `#000000` because it is correct for status accents. `ref-rvu4.2` must break the reference chain for magenta rather than inherit a black value.

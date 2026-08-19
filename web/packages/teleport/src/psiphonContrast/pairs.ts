@@ -108,7 +108,7 @@ export const EXCLUDED_LEAVES: readonly ExcludedLeaf[] = [
   {
     path: 'dataVisualisation.primary.purple',
     reason:
-      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+      'Referenced by terminal.brightMagenta in theme (deferred to ref-rvu4.2)',
   },
   {
     path: 'dataVisualisation.primary.wednesdays',
@@ -118,21 +118,22 @@ export const EXCLUDED_LEAVES: readonly ExcludedLeaf[] = [
   {
     path: 'dataVisualisation.primary.picton',
     reason:
-      'Reachable only through theme.type === "dark" branch in web/packages/teleport/src/ManagedUpdates/shared.tsx:265 (dead in light-only fork)',
+      'Referenced by terminal.brightBlue in theme (deferred to ref-rvu4.2)',
   },
   {
     path: 'dataVisualisation.primary.caribbean',
     reason:
-      'Reachable only through theme.type === "dark" branch in web/packages/teleport/src/ManagedUpdates/shared.tsx:260 (dead in light-only fork)',
+      'Referenced by terminal.brightGreen in theme (deferred to ref-rvu4.2)',
   },
   {
     path: 'dataVisualisation.primary.abbey',
-    reason: 'No reader anywhere in web/packages',
+    reason:
+      'Referenced by terminal.brightRed in theme (deferred to ref-rvu4.2)',
   },
   {
     path: 'dataVisualisation.primary.cyan',
     reason:
-      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+      'Referenced by terminal.brightCyan in theme (deferred to ref-rvu4.2)',
   },
   {
     path: 'dataVisualisation.secondary.purple',
@@ -165,7 +166,7 @@ export const EXCLUDED_LEAVES: readonly ExcludedLeaf[] = [
   {
     path: 'dataVisualisation.tertiary.cyan',
     reason:
-      'No reader anywhere in web/packages (seven leaves used only by teleterm, which the fork does not ship)',
+      'Referenced by terminal.cyan and editor.cyan in theme (deferred to ref-rvu4.2)',
   },
 ];
 
@@ -268,6 +269,167 @@ const EDITOR_DEFERRED_TOKENS = [
   'editor.sunflower',
   'editor.caribbean',
 ] as const;
+
+/**
+ * Record for a deferred token whose theme definition references another token path.
+ * Tracks both the inherited resolved value in the baseline theme and the value
+ * assigned by design decisions (D20-D26).
+ */
+export interface DeferredReferenceEdge {
+  /** Deferred token path (e.g., 'terminal.red') */
+  readonly deferredPath: string;
+  /** Target token path referenced in theme (e.g., 'dataVisualisation.tertiary.abbey') */
+  readonly sourcePath: string;
+  /** Mapping decision ID for source token if decided (e.g., 'D23'), or 'D27' / 'None' */
+  readonly decision: string;
+  /** Measured inherited resolved hex value in baseline theme (e.g., '#9D0A00') */
+  readonly inheritedHex: string;
+  /** Decided resolved hex value given by design decision (e.g., '#860A14') */
+  readonly decidedHex: string;
+}
+
+export const DEFERRED_REFERENCE_EDGES: readonly DeferredReferenceEdge[] = [
+  {
+    deferredPath: 'terminal.red',
+    sourcePath: 'dataVisualisation.tertiary.abbey',
+    decision: 'D23',
+    inheritedHex: '#9D0A00',
+    decidedHex: '#860A14',
+  },
+  {
+    deferredPath: 'terminal.green',
+    sourcePath: 'dataVisualisation.tertiary.caribbean',
+    decision: 'D20',
+    inheritedHex: '#005742',
+    decidedHex: '#03830E',
+  },
+  {
+    deferredPath: 'terminal.yellow',
+    sourcePath: 'dataVisualisation.tertiary.sunflower',
+    decision: 'D21',
+    inheritedHex: '#704B00',
+    decidedHex: '#996700',
+  },
+  {
+    deferredPath: 'terminal.blue',
+    sourcePath: 'dataVisualisation.tertiary.picton',
+    decision: 'D24',
+    inheritedHex: '#004B89',
+    decidedHex: '#004570',
+  },
+  {
+    deferredPath: 'terminal.magenta',
+    sourcePath: 'dataVisualisation.tertiary.purple',
+    decision: 'D22',
+    inheritedHex: '#3D1BB2',
+    decidedHex: '#000000',
+  },
+  {
+    deferredPath: 'terminal.cyan',
+    sourcePath: 'dataVisualisation.tertiary.cyan',
+    decision: 'D27',
+    inheritedHex: '#015C6E',
+    decidedHex: '#015C6E',
+  },
+  {
+    deferredPath: 'terminal.brightRed',
+    sourcePath: 'dataVisualisation.primary.abbey',
+    decision: 'D27',
+    inheritedHex: '#BF372E',
+    decidedHex: '#BF372E',
+  },
+  {
+    deferredPath: 'terminal.brightGreen',
+    sourcePath: 'dataVisualisation.primary.caribbean',
+    decision: 'D27',
+    inheritedHex: '#007562',
+    decidedHex: '#007562',
+  },
+  {
+    deferredPath: 'terminal.brightYellow',
+    sourcePath: 'dataVisualisation.primary.sunflower',
+    decision: 'D25',
+    inheritedHex: '#8F5F00',
+    decidedHex: '#7A5200',
+  },
+  {
+    deferredPath: 'terminal.brightBlue',
+    sourcePath: 'dataVisualisation.primary.picton',
+    decision: 'D27',
+    inheritedHex: '#006BB8',
+    decidedHex: '#006BB8',
+  },
+  {
+    deferredPath: 'terminal.brightMagenta',
+    sourcePath: 'dataVisualisation.primary.purple',
+    decision: 'D27',
+    inheritedHex: '#5531D4',
+    decidedHex: '#5531D4',
+  },
+  {
+    deferredPath: 'terminal.brightCyan',
+    sourcePath: 'dataVisualisation.primary.cyan',
+    decision: 'D27',
+    inheritedHex: '#007282',
+    decidedHex: '#007282',
+  },
+  {
+    deferredPath: 'terminal.background',
+    sourcePath: 'levels.sunken',
+    decision: 'D6',
+    inheritedHex: '#F1F2F4',
+    decidedHex: '#F7F7F7',
+  },
+  {
+    deferredPath: 'terminal.cursorAccent',
+    sourcePath: 'levels.sunken',
+    decision: 'D6',
+    inheritedHex: '#F1F2F4',
+    decidedHex: '#F7F7F7',
+  },
+  {
+    deferredPath: 'editor.abbey',
+    sourcePath: 'dataVisualisation.tertiary.abbey',
+    decision: 'D23',
+    inheritedHex: '#9D0A00',
+    decidedHex: '#860A14',
+  },
+  {
+    deferredPath: 'editor.caribbean',
+    sourcePath: 'dataVisualisation.tertiary.caribbean',
+    decision: 'D20',
+    inheritedHex: '#005742',
+    decidedHex: '#03830E',
+  },
+  {
+    deferredPath: 'editor.sunflower',
+    sourcePath: 'dataVisualisation.tertiary.sunflower',
+    decision: 'D21',
+    inheritedHex: '#704B00',
+    decidedHex: '#996700',
+  },
+  {
+    deferredPath: 'editor.picton',
+    sourcePath: 'dataVisualisation.tertiary.picton',
+    decision: 'D24',
+    inheritedHex: '#004B89',
+    decidedHex: '#004570',
+  },
+  {
+    deferredPath: 'editor.purple',
+    sourcePath: 'dataVisualisation.tertiary.purple',
+    decision: 'D22',
+    inheritedHex: '#3D1BB2',
+    decidedHex: '#000000',
+  },
+  {
+    deferredPath: 'editor.cyan',
+    sourcePath: 'dataVisualisation.tertiary.cyan',
+    decision: 'D27',
+    inheritedHex: '#015C6E',
+    decidedHex: '#015C6E',
+  },
+];
 
 function buildContrastPairs(): ContrastPair[] {
   const pairs: ContrastPair[] = [];
