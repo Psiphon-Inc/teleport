@@ -348,8 +348,18 @@ export const psiphonUiTheme: UiTheme = {
  * read. isCustomTheme does double duty: it marks the theme as bespoke, and
  * UserMenuNav uses it to hide the light and dark switcher, which would otherwise
  * offer a mode this theme does not have.
+ *
+ * Font stacks name Inter and DM Mono first. Stacks end in system fallbacks.
+ * The UI degrades to a system font until ref-rvu4.8 ships font files.
  */
 export const psiphonLegacyTheme: ThemeDefinition = {
   ...lightTheme,
   isCustomTheme: true,
+  font: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+  fonts: {
+    ...lightTheme.fonts,
+    sansSerif:
+      'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+    mono: 'DM Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  },
 };
