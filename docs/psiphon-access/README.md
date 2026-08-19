@@ -15,6 +15,7 @@ measurement, which the root `README.md` explains. The rest of the fork lives in
 
 | Document | Kind | Status |
 |---|---|---|
+| [`design/2026-08-19-type-scale-mapping.md`](design/2026-08-19-type-scale-mapping.md) | Design | **Current.** Recorded type scale mapping between Teleport font sizes, named typography roles, and Psiphon brand steps. |
 | [`design/2026-08-19-terminal-editor-values.md`](design/2026-08-19-terminal-editor-values.md) | Design | **Current.** Authoritative contract for the 23 terminal leaves and 6 editor leaves, derived under ADR 0005. |
 | [`design/2026-08-19-dm-mono-metrics.md`](design/2026-08-19-dm-mono-metrics.md) | Design | **Current.** Proof that the DM Mono grid holds when bold maps to Medium 500, with the metric measurements, the xterm.js contract and the licence finding. |
 | [`design/2026-08-18-contrast-baseline.md`](design/2026-08-18-contrast-baseline.md) | Design | **Current.** Recorded contrast and separation baseline for the inherited Teleport theme measured against commit ddefc7b22c5. |
