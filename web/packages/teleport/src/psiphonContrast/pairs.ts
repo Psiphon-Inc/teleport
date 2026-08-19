@@ -108,7 +108,7 @@ export const EXCLUDED_LEAVES: readonly ExcludedLeaf[] = [
   {
     path: 'dataVisualisation.primary.purple',
     reason:
-      'Referenced by terminal.brightMagenta in theme (deferred to ref-rvu4.2)',
+      'No reader. terminal.brightMagenta referenced it until ref-rvu4.6 gave that slot a literal value, which broke the chain',
   },
   {
     path: 'dataVisualisation.primary.wednesdays',
@@ -118,22 +118,22 @@ export const EXCLUDED_LEAVES: readonly ExcludedLeaf[] = [
   {
     path: 'dataVisualisation.primary.picton',
     reason:
-      'Referenced by terminal.brightBlue in theme (deferred to ref-rvu4.2)',
+      'No reader. terminal.brightBlue referenced it until ref-rvu4.6 gave that slot a literal value, which broke the chain',
   },
   {
     path: 'dataVisualisation.primary.caribbean',
     reason:
-      'Referenced by terminal.brightGreen in theme (deferred to ref-rvu4.2)',
+      'No reader. terminal.brightGreen referenced it until ref-rvu4.6 gave that slot a literal value, which broke the chain',
   },
   {
     path: 'dataVisualisation.primary.abbey',
     reason:
-      'Referenced by terminal.brightRed in theme (deferred to ref-rvu4.2)',
+      'No reader. terminal.brightRed referenced it until ref-rvu4.6 gave that slot a literal value, which broke the chain',
   },
   {
     path: 'dataVisualisation.primary.cyan',
     reason:
-      'Referenced by terminal.brightCyan in theme (deferred to ref-rvu4.2)',
+      'No reader. terminal.brightCyan referenced it until ref-rvu4.6 gave that slot a literal value, which broke the chain',
   },
   {
     path: 'dataVisualisation.secondary.purple',
@@ -166,7 +166,7 @@ export const EXCLUDED_LEAVES: readonly ExcludedLeaf[] = [
   {
     path: 'dataVisualisation.tertiary.cyan',
     reason:
-      'Referenced by terminal.cyan and editor.cyan in theme (deferred to ref-rvu4.2)',
+      'No reader. terminal.cyan and editor.cyan referenced it until ref-rvu4.6 gave both slots literal values, which broke the chains',
   },
 ];
 
@@ -288,148 +288,7 @@ export interface DeferredReferenceEdge {
   readonly decidedHex: string;
 }
 
-export const DEFERRED_REFERENCE_EDGES: readonly DeferredReferenceEdge[] = [
-  {
-    deferredPath: 'terminal.red',
-    sourcePath: 'dataVisualisation.tertiary.abbey',
-    decision: 'D23',
-    inheritedHex: '#9D0A00',
-    decidedHex: '#860A14',
-  },
-  {
-    deferredPath: 'terminal.green',
-    sourcePath: 'dataVisualisation.tertiary.caribbean',
-    decision: 'D20',
-    inheritedHex: '#005742',
-    decidedHex: '#03830E',
-  },
-  {
-    deferredPath: 'terminal.yellow',
-    sourcePath: 'dataVisualisation.tertiary.sunflower',
-    decision: 'D21',
-    inheritedHex: '#704B00',
-    decidedHex: '#996700',
-  },
-  {
-    deferredPath: 'terminal.blue',
-    sourcePath: 'dataVisualisation.tertiary.picton',
-    decision: 'D24',
-    inheritedHex: '#004B89',
-    decidedHex: '#004570',
-  },
-  {
-    deferredPath: 'terminal.magenta',
-    sourcePath: 'dataVisualisation.tertiary.purple',
-    decision: 'D22',
-    inheritedHex: '#3D1BB2',
-    decidedHex: '#000000',
-  },
-  {
-    deferredPath: 'terminal.cyan',
-    sourcePath: 'dataVisualisation.tertiary.cyan',
-    decision: 'D27',
-    inheritedHex: '#015C6E',
-    decidedHex: '#015C6E',
-  },
-  {
-    deferredPath: 'terminal.brightRed',
-    sourcePath: 'dataVisualisation.primary.abbey',
-    decision: 'D27',
-    inheritedHex: '#BF372E',
-    decidedHex: '#BF372E',
-  },
-  {
-    deferredPath: 'terminal.brightGreen',
-    sourcePath: 'dataVisualisation.primary.caribbean',
-    decision: 'D27',
-    inheritedHex: '#007562',
-    decidedHex: '#007562',
-  },
-  {
-    deferredPath: 'terminal.brightYellow',
-    sourcePath: 'dataVisualisation.primary.sunflower',
-    decision: 'D25',
-    inheritedHex: '#8F5F00',
-    decidedHex: '#7A5200',
-  },
-  {
-    deferredPath: 'terminal.brightBlue',
-    sourcePath: 'dataVisualisation.primary.picton',
-    decision: 'D27',
-    inheritedHex: '#006BB8',
-    decidedHex: '#006BB8',
-  },
-  {
-    deferredPath: 'terminal.brightMagenta',
-    sourcePath: 'dataVisualisation.primary.purple',
-    decision: 'D27',
-    inheritedHex: '#5531D4',
-    decidedHex: '#5531D4',
-  },
-  {
-    deferredPath: 'terminal.brightCyan',
-    sourcePath: 'dataVisualisation.primary.cyan',
-    decision: 'D27',
-    inheritedHex: '#007282',
-    decidedHex: '#007282',
-  },
-  {
-    deferredPath: 'terminal.background',
-    sourcePath: 'levels.sunken',
-    decision: 'D6',
-    inheritedHex: '#F1F2F4',
-    decidedHex: '#F7F7F7',
-  },
-  {
-    deferredPath: 'terminal.cursorAccent',
-    sourcePath: 'levels.sunken',
-    decision: 'D6',
-    inheritedHex: '#F1F2F4',
-    decidedHex: '#F7F7F7',
-  },
-  {
-    deferredPath: 'editor.abbey',
-    sourcePath: 'dataVisualisation.tertiary.abbey',
-    decision: 'D23',
-    inheritedHex: '#9D0A00',
-    decidedHex: '#860A14',
-  },
-  {
-    deferredPath: 'editor.caribbean',
-    sourcePath: 'dataVisualisation.tertiary.caribbean',
-    decision: 'D20',
-    inheritedHex: '#005742',
-    decidedHex: '#03830E',
-  },
-  {
-    deferredPath: 'editor.sunflower',
-    sourcePath: 'dataVisualisation.tertiary.sunflower',
-    decision: 'D21',
-    inheritedHex: '#704B00',
-    decidedHex: '#996700',
-  },
-  {
-    deferredPath: 'editor.picton',
-    sourcePath: 'dataVisualisation.tertiary.picton',
-    decision: 'D24',
-    inheritedHex: '#004B89',
-    decidedHex: '#004570',
-  },
-  {
-    deferredPath: 'editor.purple',
-    sourcePath: 'dataVisualisation.tertiary.purple',
-    decision: 'D22',
-    inheritedHex: '#3D1BB2',
-    decidedHex: '#000000',
-  },
-  {
-    deferredPath: 'editor.cyan',
-    sourcePath: 'dataVisualisation.tertiary.cyan',
-    decision: 'D27',
-    inheritedHex: '#015C6E',
-    decidedHex: '#015C6E',
-  },
-];
+export const DEFERRED_REFERENCE_EDGES: readonly DeferredReferenceEdge[] = [];
 
 function buildContrastPairs(): ContrastPair[] {
   const pairs: ContrastPair[] = [];
@@ -509,6 +368,16 @@ function buildContrastPairs(): ContrastPair[] {
     kind: 'normalText',
     floorReason:
       'WCAG 2.1 AA 1.4.3 white label on brand accent (refused in D2)',
+    exempt: true,
+    // THIS IS NOT A WCAG 1.4.3 EXEMPTION, and the `exempt` field is overloaded
+    // here. D2 forbids the COMBINATION rather than granting relief from a floor.
+    // D2 states it plainly: "It must not carry a label. White on #FF703C is
+    // 2.75:1 and fails." So the measured failure is the expected result, and the
+    // pair is kept as a watchdog for a combination the interface must never use.
+    // A contrast floor cannot express "never render this", so the gate needs a
+    // category of its own for a forbidden combination. Tracked as ref-3hq2.
+    exemptReason:
+      'D2 forbids this combination: the brand accent must not carry a label. White on #FF703C measures 2.75:1. The pair stays in the manifest as a watchdog, and it is not a WCAG 1.4.3 relief.',
   });
 
   pairs.push({
@@ -1257,33 +1126,77 @@ function buildContrastPairs(): ContrastPair[] {
       'web/packages/shared/components/LatencyDiagnostic/LatencyDiagnostic.tsx:32 Warn latency text on elevated surface',
   });
 
-  // 13. Terminal group - DEFERRED to ref-rvu4.2
+  // 13. Terminal group - live in ref-rvu4.6
   for (const termToken of TERMINAL_DEFERRED_TOKENS) {
     const shortName = termToken.replace('terminal.', '');
-    const isNonText = [
-      'selectionBackground',
-      'searchMatch',
-      'activeSearchMatch',
-      'cursor',
-      'cursorAccent',
-    ].includes(shortName);
+    const isExemptSurface = ['white', 'brightWhite'].includes(shortName);
 
-    pairs.push({
-      id: `terminal-${shortName}-on-bg`,
-      fgPath: termToken,
-      bgPath: 'terminal.background',
-      floor: isNonText ? 3 : 4.5,
-      kind: isNonText ? 'nonText' : 'normalText',
-      floorReason: isNonText
-        ? 'WCAG 2.1 AA 1.4.11 non-text terminal UI component floor'
-        : 'WCAG 2.1 AA 1.4.3 terminal text floor',
-      deferred: true,
-      deferredReason:
-        'Deferred to ref-rvu4.2 which owns the monospace face and ANSI palette',
-    });
+    if (shortName === 'cursorAccent') {
+      pairs.push({
+        id: 'terminal-cursorAccent-on-bg',
+        fgPath: 'terminal.cursorAccent',
+        bgPath: 'terminal.cursor',
+        floor: 4.5,
+        kind: 'normalText',
+        floorReason: 'WCAG 2.1 AA 1.4.3 cursor accent text inside cursor block',
+      });
+    } else if (shortName === 'selectionBackground') {
+      pairs.push({
+        id: 'terminal-selectionBackground-on-bg',
+        fgPath: 'terminal.foreground',
+        bgPath: 'terminal.selectionBackground',
+        floor: 4.5,
+        kind: 'normalText',
+        floorReason: 'WCAG 2.1 AA 1.4.3 text on terminal selection background',
+        compositeSurface: 'terminal.background',
+        compositeSurfaceReason:
+          'Selection background alpha composites over terminal.background',
+      });
+    } else if (shortName === 'searchMatch') {
+      pairs.push({
+        id: 'terminal-searchMatch-on-bg',
+        fgPath: 'terminal.foreground',
+        bgPath: 'terminal.searchMatch',
+        floor: 4.5,
+        kind: 'normalText',
+        floorReason:
+          'WCAG 2.1 AA 1.4.3 text on terminal search match background',
+      });
+    } else if (shortName === 'activeSearchMatch') {
+      pairs.push({
+        id: 'terminal-activeSearchMatch-on-bg',
+        fgPath: 'terminal.foreground',
+        bgPath: 'terminal.activeSearchMatch',
+        floor: 4.5,
+        kind: 'normalText',
+        floorReason:
+          'WCAG 2.1 AA 1.4.3 text on terminal active search match background',
+      });
+    } else {
+      const isNonText = shortName === 'cursor';
+      pairs.push({
+        id: `terminal-${shortName}-on-bg`,
+        fgPath: termToken,
+        bgPath: 'terminal.background',
+        floor: isNonText ? 3 : 4.5,
+        kind: isNonText ? 'nonText' : 'normalText',
+        floorReason: isExemptSurface
+          ? 'Rule 2 & ADR 0005: terminal.white and terminal.brightWhite carry surface step / light fill roles and are exempt from body text floor'
+          : isNonText
+            ? 'WCAG 2.1 AA 1.4.11 non-text terminal UI component floor'
+            : 'WCAG 2.1 AA 1.4.3 terminal text floor',
+        ...(isExemptSurface
+          ? {
+              exempt: true,
+              exemptReason:
+                'Rule 2 & ADR 0005: white text on light terminal background is exempt from body text floor',
+            }
+          : {}),
+      });
+    }
   }
 
-  // 14. Editor group - DEFERRED to ref-rvu4.2
+  // 14. Editor group - live in ref-rvu4.6
   for (const edToken of EDITOR_DEFERRED_TOKENS) {
     const shortName = edToken.replace('editor.', '');
     pairs.push({
@@ -1293,9 +1206,6 @@ function buildContrastPairs(): ContrastPair[] {
       floor: 4.5,
       kind: 'normalText',
       floorReason: 'WCAG 2.1 AA 1.4.3 editor syntax text floor',
-      deferred: true,
-      deferredReason:
-        'Deferred to ref-rvu4.2 which owns the monospace face and ANSI palette',
     });
   }
 
@@ -1373,19 +1283,18 @@ function generateSeparationRules(): SeparationRule[] {
     }
   }
 
-  // 2. ANSI normal slot against bright form (8 pairs) - DEFERRED
+  // 2. ANSI normal slot against bright form (8 pairs) - live in ref-rvu4.6
   for (const slot of ANSI_SLOTS) {
+    const isWhite = slot.name === 'white';
     rules.push({
       id: `terminal-ansi-sep-${slot.name}`,
       tokenA: slot.normal,
       tokenB: slot.bright,
-      minDelta: 1.3,
+      minDelta: isWhite ? 1.0 : 1.3,
       metric: 'luminanceRatio',
-      reason:
-        'ANSI normal slot must separate from its bright variant in relative luminance to maintain visual hierarchy in terminal text.',
-      deferred: true,
-      deferredReason:
-        'Deferred to ref-rvu4.2 which owns the monospace face and ANSI palette',
+      reason: isWhite
+        ? 'Named Exception in Rule 1: terminal.white and terminal.brightWhite carry surface roles and are exempt from the 1.3:1 text separation floor.'
+        : 'ANSI normal slot must separate from its bright variant in relative luminance to maintain visual hierarchy in terminal text.',
     });
   }
 

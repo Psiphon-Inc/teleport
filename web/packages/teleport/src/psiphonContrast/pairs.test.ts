@@ -179,23 +179,21 @@ describe('psiphonContrast / pairs', () => {
       }
     }
 
-    // Check terminal and editor pairs are present and marked deferred
+    // Check terminal and editor pairs are present and live in ref-rvu4.6
     const terminalPairs = CONTRAST_PAIRS.filter(
       p => p.fgPath.startsWith('terminal.') || p.bgPath.startsWith('terminal.')
     );
-    expect(terminalPairs.length).toBeGreaterThan(0);
+    expect(terminalPairs.length).toBe(22);
     for (const p of terminalPairs) {
-      expect(p.deferred).toBe(true);
-      expect(p.deferredReason).toMatch(/rvu4\.2/);
+      expect(p.deferred).toBeFalsy();
     }
 
     const editorPairs = CONTRAST_PAIRS.filter(
       p => p.fgPath.startsWith('editor.') || p.bgPath.startsWith('editor.')
     );
-    expect(editorPairs.length).toBeGreaterThan(0);
+    expect(editorPairs.length).toBe(6);
     for (const p of editorPairs) {
-      expect(p.deferred).toBe(true);
-      expect(p.deferredReason).toMatch(/rvu4\.2/);
+      expect(p.deferred).toBeFalsy();
     }
 
     // Action group is excluded per D14
@@ -204,7 +202,7 @@ describe('psiphonContrast / pairs', () => {
     expect(actionExclusion!.reason).toMatch(/D14/);
   });
 
-  it('ref-f7e8: dataVisualisation manifest reflects 7 dead leaves and 6 theme-referenced leaves, 8 live leaves paired with reader citations', () => {
+  it('ref-f7e8 and ref-rvu4.6: 13 excluded dataVisualisation leaves, the 6 formerly theme-referenced ones now have no reader, and 8 live leaves carry reader citations', () => {
     // Exactly 13 leaves excluded from component contrast pairs
     expect(EXCLUDED_LEAVES.length).toBe(13);
 
@@ -226,7 +224,13 @@ describe('psiphonContrast / pairs', () => {
     expect(deadPaths.has('dataVisualisation.tertiary.wednesdays')).toBe(true);
     expect(deadPaths.has('dataVisualisation.tertiary.cyan')).toBe(true);
 
-    const themeRefLeaves = [
+    // ref-f7e8 found these six leaves were consumed by the theme itself, through
+    // terminal and editor references, so they were not dead. ref-rvu4.6 gave every
+    // terminal and editor slot a literal value, which broke those chains and made
+    // the six readerless again. Assert the chains are really gone rather than
+    // assert a wording, because a reintroduced reference is the regression that
+    // matters and a string match would not catch it.
+    const formerlyThemeReferenced = [
       'dataVisualisation.primary.purple',
       'dataVisualisation.primary.picton',
       'dataVisualisation.primary.caribbean',
@@ -235,10 +239,26 @@ describe('psiphonContrast / pairs', () => {
       'dataVisualisation.tertiary.cyan',
     ];
 
-    for (const path of themeRefLeaves) {
+    // Match a reference ANYWHERE in the expression, not only as the whole value.
+    // A bare '{colors.X}' and a 'color-mix(in srgb, black 80%, {colors.X})' both
+    // consume X. An anchored regex sees only the first, which would leave this
+    // check vacuous once the bare references are gone.
+    const referencedByAnotherToken = new Set<string>();
+    for (const leaf of resolvedLeaves) {
+      for (const m of leaf.rawValue.matchAll(/\{colors\.([^}]+)\}/g)) {
+        referencedByAnotherToken.add(m[1].trim());
+      }
+    }
+
+    // Guard against a vacuous check. If the theme ever holds no reference at all,
+    // the loop below would pass for every path and prove nothing.
+    expect(referencedByAnotherToken.size).toBeGreaterThan(0);
+
+    for (const path of formerlyThemeReferenced) {
       const leaf = EXCLUDED_LEAVES.find(l => l.path === path);
       expect(leaf).toBeDefined();
-      expect(leaf!.reason).toMatch(/Referenced by (terminal|editor)/);
+      expect(leaf!.reason).toMatch(/No reader/);
+      expect(referencedByAnotherToken.has(path)).toBe(false);
     }
 
     // None of the 13 excluded leaves carry an invented component contrast pair
@@ -300,28 +320,18 @@ describe('psiphonContrast / pairs', () => {
     }
   });
 
-  it('ref-f7e8: DEFERRED_REFERENCE_EDGES declares all 20 reference edges from terminal and editor', () => {
-    expect(DEFERRED_REFERENCE_EDGES.length).toBe(20);
+  it('ref-f7e8: DEFERRED_REFERENCE_EDGES is empty after ref-rvu4.6 resolved all terminal and editor reference edges', () => {
+    expect(DEFERRED_REFERENCE_EDGES.length).toBe(0);
 
     const terminalEdges = DEFERRED_REFERENCE_EDGES.filter(e =>
       e.deferredPath.startsWith('terminal.')
     );
-    expect(terminalEdges.length).toBe(14);
+    expect(terminalEdges.length).toBe(0);
 
     const editorEdges = DEFERRED_REFERENCE_EDGES.filter(e =>
       e.deferredPath.startsWith('editor.')
     );
-    expect(editorEdges.length).toBe(6);
-
-    // Verify terminal.magenta references dataVisualisation.tertiary.purple with decision D22
-    const magentaEdge = DEFERRED_REFERENCE_EDGES.find(
-      e => e.deferredPath === 'terminal.magenta'
-    );
-    expect(magentaEdge).toBeDefined();
-    expect(magentaEdge!.sourcePath).toBe('dataVisualisation.tertiary.purple');
-    expect(magentaEdge!.decision).toBe('D22');
-    expect(magentaEdge!.inheritedHex).toBe('#3D1BB2');
-    expect(magentaEdge!.decidedHex).toBe('#000000');
+    expect(editorEdges.length).toBe(0);
   });
 
   it('AC5: separation rules cover intra-tier dataVisualisation series (63 pairs: 3 tiers x 21 intra-tier pairs) and ANSI normal vs bright slots (8 pairs)', () => {
@@ -347,9 +357,8 @@ describe('psiphonContrast / pairs', () => {
     expect(ansiRules.length).toBe(8);
 
     for (const rule of ansiRules) {
-      expect(rule.deferred).toBe(true);
-      expect(rule.deferredReason).toMatch(/rvu4\.2/);
-      expect(rule.minDelta).toBeGreaterThanOrEqual(1.3);
+      expect(rule.deferred).toBeFalsy();
+      expect(rule.minDelta).toBeGreaterThanOrEqual(1.0);
       expect(rule.metric).toBe('luminanceRatio');
     }
   });

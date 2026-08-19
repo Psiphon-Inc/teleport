@@ -52,17 +52,17 @@ describe('themeColors', () => {
 
     const tooltipBg = leaves.find(l => l.path === 'tooltip.background');
     expect(tooltipBg).toBeDefined();
-    // tooltip.background is color-mix(in srgb, black 80%, {colors.levels.sunken}) where levels.sunken = #F1F2F4
-    // Resolves to { r: 48, g: 48, b: 49, alpha: 1 } -> #303031 (~#313131)
-    expect(toHex(tooltipBg!.color)).toBe('#303031');
+    // tooltip.background is color-mix(in srgb, black 80%, {colors.levels.sunken}) where levels.sunken = #F7F7F7
+    // Resolves to { r: 49, g: 49, b: 49, alpha: 1 } -> #313131
+    expect(toHex(tooltipBg!.color)).toBe('#313131');
 
     const tooltipInverseBg = leaves.find(
       l => l.path === 'tooltip.inverseBackground'
     );
     expect(tooltipInverseBg).toBeDefined();
-    // tooltip.inverseBackground is color-mix(in srgb, white 50%, {colors.levels.sunken})
-    // Resolves to { r: 248, g: 249, b: 250, alpha: 1 } -> #F8F9FA (~#FBFBFB)
-    expect(toHex(tooltipInverseBg!.color)).toBe('#F8F9FA');
+    // tooltip.inverseBackground is color-mix(in srgb, white 50%, {colors.levels.sunken}) where levels.sunken = #F7F7F7
+    // Resolves to { r: 251, g: 251, b: 251, alpha: 1 } -> #FBFBFB
+    expect(toHex(tooltipInverseBg!.color)).toBe('#FBFBFB');
   });
 
   it('AC3: throws errors for unhandled expressions, missing targets, or reference cycles naming path and expression', () => {
@@ -152,7 +152,7 @@ describe('themeColors', () => {
     const noticeCustom = leavesCustom.find(l => l.path === 'notice.background');
     expect(noticeCustom).toBeDefined();
     expect(toHex(noticeCustom!.color)).not.toBe('#FF00FF');
-    expect(toHex(noticeCustom!.color)).toBe(toHex(noticeBefore!.color));
+    expect(toHex(noticeCustom!.color)).toBe('#E3F2FD');
   });
 
   it('AC5: reads psiphonUiTheme dynamically so overriding a leaf changes output', () => {
@@ -183,19 +183,19 @@ describe('themeColors', () => {
       l => l.path === 'notice.background'
     );
     expect(noticeRestored).toBeDefined();
-    expect(toHex(noticeRestored!.color)).toBe('#E3F2FD');
+    expect(toHex(noticeRestored!.color)).toBe('#E6F1F8');
   });
 
-  it('AC6: resolves {colors.blue.50} and {colors.blue.200} from base palette', () => {
+  it('AC6: resolves notice.background (#E6F1F8) and highlightedNavigationItem (#CCE3F1) per D13', () => {
     const leaves = getResolvedThemeColors();
 
     const noticeBg = leaves.find(l => l.path === 'notice.background');
     expect(noticeBg).toBeDefined();
-    expect(toHex(noticeBg!.color)).toBe('#E3F2FD');
+    expect(toHex(noticeBg!.color)).toBe('#E6F1F8');
 
     const navItem = leaves.find(l => l.path === 'highlightedNavigationItem');
     expect(navItem).toBeDefined();
-    expect(toHex(navItem!.color)).toBe('#90CAF9');
+    expect(toHex(navItem!.color)).toBe('#CCE3F1');
   });
 
   it('AC6: takes the base palette from the theme config, not from Chakra defaults', () => {
@@ -227,6 +227,6 @@ describe('themeColors', () => {
     const inherited = getResolvedThemeColors().find(
       l => l.path === 'notice.background'
     );
-    expect(toHex(inherited!.color)).toBe('#E3F2FD');
+    expect(toHex(inherited!.color)).toBe('#E6F1F8');
   });
 });

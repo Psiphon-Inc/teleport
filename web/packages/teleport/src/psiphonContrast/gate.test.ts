@@ -23,7 +23,6 @@ import {
   formatContrastReport,
   type BaselineEntry,
 } from './gate';
-import { DEFERRED_REFERENCE_EDGES } from './pairs';
 
 describe('psiphonContrast gate', () => {
   it('evaluates contrast gate and prints full report', () => {
@@ -46,19 +45,19 @@ describe('psiphonContrast gate', () => {
     // Verify expected counts
     expect(evaluation.leafCount).toBe(174);
     expect(evaluation.counts.totalPairs).toBe(179);
-    expect(evaluation.counts.pass).toBe(116);
-    expect(evaluation.counts.baseline).toBe(25);
-    expect(evaluation.counts.exempt).toBe(7);
+    expect(evaluation.counts.pass).toBe(156);
+    expect(evaluation.counts.baseline).toBe(10);
+    expect(evaluation.counts.exempt).toBe(10);
     expect(evaluation.counts.notBoundary).toBe(3);
-    expect(evaluation.counts.deferred).toBe(28);
+    expect(evaluation.counts.deferred).toBe(0);
 
     expect(evaluation.counts.separationTotal).toBe(71);
-    expect(evaluation.counts.separationPass).toBe(17);
-    expect(evaluation.counts.separationBaseline).toBe(46);
-    expect(evaluation.counts.separationDeferred).toBe(8);
+    expect(evaluation.counts.separationPass).toBe(43);
+    expect(evaluation.counts.separationBaseline).toBe(28);
+    expect(evaluation.counts.separationDeferred).toBe(0);
 
-    expect(evaluation.counts.deferredEdgeTotal).toBe(20);
-    expect(evaluation.counts.deferredEdgePass).toBe(20);
+    expect(evaluation.counts.deferredEdgeTotal).toBe(0);
+    expect(evaluation.counts.deferredEdgePass).toBe(0);
   });
 
   it('fails with detailed message when a pair below floor is not in baseline', () => {
@@ -74,9 +73,9 @@ describe('psiphonContrast gate', () => {
     // Verify failure message names both token paths, resolved colours, measured ratio, and floor
     expect(failureMsg).toContain('fg=text.muted');
     expect(failureMsg).toContain('bg=levels.deep');
-    expect(failureMsg).toContain('(#6A6B6C)');
-    expect(failureMsg).toContain('(#E6E9EA)');
-    expect(failureMsg).toContain('4.38:1');
+    expect(failureMsg).toContain('(#757575)');
+    expect(failureMsg).toContain('(#EDEDED)');
+    expect(failureMsg).toContain('3.94:1');
     expect(failureMsg).toContain('floor 4.5:1');
   });
 
@@ -127,12 +126,20 @@ describe('psiphonContrast gate', () => {
   });
 
   it('proves deferred reference edge guard is not vacuous: mutating a declared entry produces a named failure', () => {
-    // Mutate terminal.red's declared inherited value from #9D0A00 to #000000
-    const mutatedEdges = DEFERRED_REFERENCE_EDGES.map(edge =>
-      edge.deferredPath === 'terminal.red'
-        ? { ...edge, inheritedHex: '#000000' }
-        : edge
-    );
+    // Synthetic edge list to prove the edge guard
+    const syntheticEdges = [
+      {
+        deferredPath: 'terminal.background',
+        sourcePath: 'levels.sunken',
+        decision: 'D6',
+        inheritedHex: '#F7F7F7',
+        decidedHex: '#F7F7F7',
+      },
+    ];
+    const mutatedEdges = syntheticEdges.map(edge => ({
+      ...edge,
+      inheritedHex: '#000000',
+    }));
 
     const evaluation = evaluateContrastGate(
       psiphonUiTheme,
@@ -142,12 +149,9 @@ describe('psiphonContrast gate', () => {
 
     expect(evaluation.deferredReferenceFailures.length).toBe(1);
     const failureMsg = evaluation.deferredReferenceFailures[0];
-    expect(failureMsg).toContain('terminal.red');
+    expect(failureMsg).toContain('terminal.background');
     expect(failureMsg).toContain(
-      'Deferred reference edge value moved for "terminal.red": measured resolved value #9D0A00 no longer matches declared inherited value #000000'
-    );
-    expect(failureMsg).toContain(
-      'moved by D23 decision on dataVisualisation.tertiary.abbey to #860A14'
+      'Declared deferred reference edge "terminal.background" -> "levels.sunken" is absent from theme.'
     );
   });
 });
