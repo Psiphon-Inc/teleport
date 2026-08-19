@@ -1,9 +1,10 @@
 # Psiphon Access theme token mapping
 
-**Status: COMPLETE for ref-rvu4.1 scope. 21 of 21 role groups decided, 174 of 174 leaves** (145 mapped, with terminal 23 and editor 6 deferred to ref-rvu4.2). Light
+**Status: COMPLETE for ref-rvu4.1 and ref-rvu4.2 scope. All 21 of 21 role groups decided, 174 of 174 leaves mapped** (145 mapped in ref-rvu4.1, and terminal 23 and editor 6 decided in ref-rvu4.2 under ADR 0005 and `2026-08-19-terminal-editor-values.md`). Light
 values only. The operator approved D1 to D18 on 2026-08-17. The operator
 delegated the four remaining colour choices on 2026-08-18, and D19 to D28 were
-made under that delegation and are reversible.
+made under that delegation. ADR 0005 approved the terminal and editor rules on
+2026-08-19.
 
 This document is the contract the theme implementations follow. `ref-rvu4.6`
 implements the Chakra config from it. Nothing implements a colour that is not in
@@ -505,17 +506,21 @@ Across all 174 leaves in the theme (including the 29 deferred monospace leaves):
 
 Every figure here was counted leaf by leaf.
 
-## Groups not yet decided
+## Groups decided in ref-rvu4.2
 
 2 groups, 29 leaves: `terminal` 23, `editor` 6.
 
-`terminal` (23 leaves) and `editor` (6 leaves) are deferred to `ref-rvu4.2`, which owns the monospace face and the ANSI palette. All 21 role groups in the scope of `ref-rvu4.1` are decided and mapped.
+`terminal` (23 leaves) and `editor` (6 leaves) are decided in `ref-rvu4.2` under ADR 0005. The authoritative values, measurements, and CVD analysis are recorded in [`2026-08-19-terminal-editor-values.md`](2026-08-19-terminal-editor-values.md). All 21 role groups in the theme are now fully decided and mapped.
 
-### Inherited ANSI slot changes from dataVisualisation decisions
+### Resolution of terminal reference chains and magenta collapse
 
-The dataVisualisation decisions D20 to D25 change six ANSI slots through theme reference chains. The table below lists the affected ANSI slots, their inherited Teleport values, and the values given by dataVisualisation decisions:
+Decision D22 assigned `#000000` to `dataVisualisation.tertiary.purple` for status primary accent borders. In the baseline theme reference chain, `terminal.magenta` inherited `{colors.dataVisualisation.tertiary.purple}`, which caused `terminal.magenta` to collapse onto `terminal.black` (`#000000`).
 
-| ANSI slot | Source token | Decision | Inherited value | Decided value |
+Under ADR 0005, all 12 chromatic ANSI terminal tokens break their reference chains to `dataVisualisation.*` and take literal derived values from Selenized Light. Decision D22 remains `#000000` for status borders. `terminal.magenta` takes literal `#a03778`, separating from `brightMagenta` (`#be418e`) by 1.31:1 and resolving the collapse defect.
+
+The table below is HISTORY. It records what the `dataVisualisation` decisions did to six ANSI slots while the reference chains were still live, which is what `ref-f7e8` found. Breaking the chains removed that effect. Keep the table, because it explains why the chains had to be broken.
+
+| ANSI slot | Source token | Decision | Inherited value | Value the chain gave it |
 |---|---|---|---|---|
 | `terminal.red` | `dataVisualisation.tertiary.abbey` | D23 | `#9D0A00` | `#860A14` |
 | `terminal.green` | `dataVisualisation.tertiary.caribbean` | D20 | `#005742` | `#03830E` |
@@ -524,8 +529,4 @@ The dataVisualisation decisions D20 to D25 change six ANSI slots through theme r
 | `terminal.magenta` | `dataVisualisation.tertiary.purple` | D22 | `#3D1BB2` | `#000000` |
 | `terminal.brightYellow` | `dataVisualisation.primary.sunflower` | D25 | `#8F5F00` | `#7A5200` |
 
-### Known defect for ref-rvu4.2: terminal.magenta collapse
-
-Decision D22 assigns `#000000` to `dataVisualisation.tertiary.purple` for status primary accent borders. Through the theme reference chain, `terminal.magenta` inherits `#000000`. This makes `terminal.magenta` identical to `terminal.black` (`#000000`).
-
-This pair collapse is a defect for `ref-rvu4.2` to resolve. Decision D22 stays `#000000` because it is correct for status accents. `ref-rvu4.2` must break the reference chain for magenta rather than inherit a black value.
+`editor.abbey` (`#860A14`) and `editor.sunflower` (`#996700`) retain their references to dataVisualisation decisions D23 and D21. The four remaining editor leaves (`editor.purple`, `editor.cyan`, `editor.picton`, `editor.caribbean`) have no live reader in shipped UI code and are recorded as excluded leaves.
