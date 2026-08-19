@@ -128,6 +128,13 @@ The affected footers now read `© Psiphon Inc. Portions © Gravitational, Inc.`.
 The pre-authentication page keeps the fork notice discussed in AGPL section
 5(a). It also keeps the Corresponding Source offer discussed in section 13.
 
+Both footers render this copyright line alone. The fork removed their links to
+Gravitational's Terms of Service and Privacy Policy. No Terms of Service or
+Privacy Policy is published for this internal service. Gravitational's terms do
+not govern it. A Psiphon consumer page is for another product. A link that
+names the wrong terms is worse than no link. The removal is reversible in one
+commit when the operator publishes a real URL.
+
 This is not legal advice.
 
 ## Meeting AGPL section 13

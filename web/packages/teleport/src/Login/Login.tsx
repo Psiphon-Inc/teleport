@@ -228,29 +228,10 @@ function LicenseAcknowledgement({
       </LicenseBox>
       <Footer>
         <Text>© Psiphon Inc. Portions © Gravitational, Inc.</Text>
-        <FooterLink
-          as="a"
-          href="https://goteleport.com/legal/tos/"
-          target="_blank"
-        >
-          Terms of Service
-        </FooterLink>
-        <FooterLink
-          as="a"
-          href="https://goteleport.com/legal/privacy/"
-          target="_blank"
-        >
-          Privacy Policy
-        </FooterLink>
       </Footer>
     </>
   );
 }
-
-const FooterLink = styled(Text)`
-  color: ${props => props.theme.colors.text.main};
-  text-decoration: none;
-`;
 
 const Footer = styled(Flex)`
   width: 100%;
