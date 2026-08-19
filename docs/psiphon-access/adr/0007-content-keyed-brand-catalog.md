@@ -1,12 +1,13 @@
 # ADR 0007. Content-keyed brand catalog for Psiphon Access
 
-**Status: part accepted, part proposed, 2026-08-19.**
+**Status: accepted, 2026-08-19.**
 
 The operator accepted the catalog, the failing gate and the scope of 196
-reachable phrases on 2026-08-19. The operator has not yet chosen where the
-substitution happens. This record recommends one of the two options and states
-the evidence that decided the recommendation. `ref-o74l.3` may not start until
-the operator answers that one question.
+reachable phrases on 2026-08-19. Later the same day the operator chose option 1,
+the build-time transform. The committed source keeps upstream wording.
+
+Three corrections are pending against this record. A planning pass found them
+within an hour of it being written. See "Corrections" at the end.
 
 This record specifies a format and a gate. It writes no catalog data, no
 plugin and no test.
@@ -38,10 +39,13 @@ upstream rebase, and what build step fails when the replacement is incomplete?
    not host a documentation site. A broken link is worse than an
    upstream-branded one.
 
-### Recommended, and awaiting the operator
+### Also accepted on 2026-08-19
 
 6. The substitution happens at **build time**, in a vite plugin. The committed
-   source keeps upstream wording. See "Where the substitution happens".
+   source keeps upstream wording. See "Where the substitution happens". The
+   operator chose this option after reading the measured rebase exposure: about
+   97 modified upstream files and 190 upstream commits a year under committed
+   source edits, against 1 file and 12 commits a year under the transform.
 
 
 ## Why a patch stack was rejected
