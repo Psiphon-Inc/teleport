@@ -22,6 +22,7 @@ measurement, which the root `README.md` explains. The rest of the fork lives in
 | [`adr/0001-prefer-the-oidc-connector-model.md`](adr/0001-prefer-the-oidc-connector-model.md) | Decision | Accepted. Why the fork reuses the upstream OIDC connector instead of cloning the GitHub connector. Supporting text is historical. |
 | [`adr/0002-oidc-runtime-scope-and-approach.md`](adr/0002-oidc-runtime-scope-and-approach.md) | Decision | Accepted. Why browser and CLI login ship together and admin UI does not. Supporting text is historical. |
 | [`adr/0003-author-a-full-token-set.md`](adr/0003-author-a-full-token-set.md) | Decision | Accepted. Why the fork authors a complete token set rather than merging values over Teleport config. |
+| [`adr/0004-bundle-inter-font-assets.md`](adr/0004-bundle-inter-font-assets.md) | Decision | Accepted, and reversible. The coordinator chose it, not the operator. Why the fork bundles Inter font assets instead of referencing host fonts. |
 | [`source-provenance.md`](source-provenance.md) | Licence record | Current. What this fork is built from, and how its notices work. |
 | [`runbook/google-oidc-first-deployment.md`](runbook/google-oidc-first-deployment.md) | Runbook | **History. Do not follow it.** It describes the replaced prototype. Rewrite tracked as ref-qnnq. |
 
