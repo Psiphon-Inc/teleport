@@ -25,6 +25,7 @@ import {
   BRAND_BASELINE,
   BRAND_BASELINE_BY_AREA,
   BRAND_CATALOG,
+  BRAND_ENTRIES_BY_AREA,
   EXCLUDED_HOSTS,
   PROTOCOL_ENTRIES,
   type BrandArea,
@@ -41,6 +42,7 @@ import {
 import {
   editsForRegion,
   matchNode,
+  orderMatchRules,
   sortLongestFirst,
   visitNodes,
 } from './brandMatcher';
@@ -88,6 +90,14 @@ function baselineOf(
   return { ...EMPTY_BASELINE, [area]: entries };
 }
 
+/**
+ * The measured cross-leaf case. The immutable identifier belongs in the
+ * integrations-aws leaf. The enclosing phrase is baselined in the
+ * discover-enrolment leaf, and no integrations author ever touches it.
+ */
+const KUBE_AGENT = 'teleport-kube-agent';
+const KUBE_AGENT_PHRASE = `${KUBE_AGENT} is already installed on the cluster`;
+
 const phrase = (over: Partial<BrandPhrase> = {}): BrandPhrase => ({
   source: 'Teleport Fixture',
   replacement: 'Psiphon Access Fixture',
@@ -99,16 +109,61 @@ const phrase = (over: Partial<BrandPhrase> = {}): BrandPhrase => ({
 });
 
 describe('psiphonBrand catalog shape', () => {
-  it('ships seven leaf modules and every leaf is empty of authored copy', () => {
+  // NO ASSERTION IN THIS FILE PINS AN ENTRY COUNT. A count is a one-time
+  // measurement and every authoring child moves it. An assertion that pins
+  // today's count is a tripwire for tomorrow's work, so each assertion below
+  // pins a RELATIONSHIP that must hold at every catalog size, including the
+  // empty one this machinery shipped and the full one the seven leaves reach.
+
+  it('ships seven leaves, and both maps carry exactly those leaves', () => {
     expect(BRAND_AREAS).toHaveLength(7);
+    expect(new Set(BRAND_AREAS).size).toBe(BRAND_AREAS.length);
+    expect(Object.keys(BRAND_ENTRIES_BY_AREA).sort()).toEqual(
+      [...BRAND_AREAS].sort()
+    );
+    expect(Object.keys(BRAND_BASELINE_BY_AREA).sort()).toEqual(
+      [...BRAND_AREAS].sort()
+    );
     for (const area of BRAND_AREAS) {
-      // Acceptance criterion 9: the machinery child authors no replacement
-      // copy. Every catalog leaf ships empty, so four authoring children can
-      // fill disjoint files in parallel.
-      expect(BRAND_CATALOG.filter(e => !e.immutable)).toHaveLength(0);
-      expect(BRAND_BASELINE_BY_AREA[area]).toBeDefined();
+      expect(Array.isArray(BRAND_ENTRIES_BY_AREA[area])).toBe(true);
+      expect(Array.isArray(BRAND_BASELINE_BY_AREA[area])).toBe(true);
     }
-    expect(BRAND_CATALOG).toHaveLength(PROTOCOL_ENTRIES.length);
+  });
+
+  it('aggregates to exactly the protocol entries plus every leaf', () => {
+    const leafTotal = BRAND_AREAS.reduce(
+      (n, area) => n + BRAND_ENTRIES_BY_AREA[area].length,
+      0
+    );
+    expect(BRAND_CATALOG).toHaveLength(PROTOCOL_ENTRIES.length + leafTotal);
+    expect(BRAND_CATALOG).toEqual([
+      ...PROTOCOL_ENTRIES,
+      ...BRAND_AREAS.flatMap(area => [...BRAND_ENTRIES_BY_AREA[area]]),
+    ]);
+
+    const baselineTotal = BRAND_AREAS.reduce(
+      (n, area) => n + BRAND_BASELINE_BY_AREA[area].length,
+      0
+    );
+    expect(BRAND_BASELINE).toHaveLength(baselineTotal);
+  });
+
+  it('holds no two entries with the same source', () => {
+    const sources = BRAND_CATALOG.map(e => e.source);
+    expect(new Set(sources).size).toBe(sources.length);
+  });
+
+  it('holds only valid entries, and protocol tier always implies immutable', () => {
+    expect(validateCatalog(BRAND_CATALOG)).toEqual([]);
+    for (const entry of BRAND_CATALOG.filter(e => e.tier === 'protocol')) {
+      expect(entry.immutable).toBe(true);
+      expect(entry.replacement).toBe(entry.source);
+    }
+    for (const entry of BRAND_CATALOG) {
+      expect(entry.immutable).toBe(entry.replacement === entry.source);
+      expect(entry.count).toBeGreaterThanOrEqual(1);
+      expect(entry.reason.trim()).not.toBe('');
+    }
   });
 
   it('holds the five immutable entries and no pattern field', () => {
@@ -230,12 +285,95 @@ describe('psiphonBrand matcher', () => {
         tier: 'protocol',
       }),
     ];
-    const { regions, residuals } = matchNode(node, sortLongestFirst(catalog));
+    const { regions, residuals } = matchNode(
+      node,
+      orderMatchRules(catalog, [])
+    );
     expect(regions).toHaveLength(1);
     expect(regions[0].entry.source).toBe(
       'TeleportDatabaseAccess_${props.name}'
     );
     expect(residuals).toHaveLength(0);
+  });
+
+  it('orders entries the same way with or without a baseline in the list', () => {
+    // `bundleGate.ts` reads a bundle, which has no baseline, so it keeps the
+    // entry-only ordering. The two must not drift apart on the entries.
+    const entries = [
+      phrase({ source: 'Teleport A' }),
+      phrase({ source: 'Teleport Longer B' }),
+      phrase({ source: 'Teleport C' }),
+    ];
+    expect(orderMatchRules(entries, []).map(rule => rule.source)).toEqual(
+      sortLongestFirst(entries).map(entry => entry.source)
+    );
+  });
+
+  it('orders a baselined phrase and a catalog entry by length, longest first', () => {
+    // DEFECT 2. The short immutable entry belongs to one leaf. The long phrase
+    // is baselined in another. Without a shared ordering the short entry
+    // consumes inside the long phrase, the phrase loses its residual, and the
+    // other leaf takes a RATCHET_FAIL its author never caused.
+    const code = `const e = <p>${KUBE_AGENT_PHRASE}</p>;`;
+    const node = visitNodes(code, 'x.tsx').filter(n => n.kind === 'jsxText')[0];
+    const entry = phrase({
+      source: KUBE_AGENT,
+      replacement: KUBE_AGENT,
+      immutable: true,
+      tier: 'protocol',
+    });
+    const { regions, shields, residuals } = matchNode(
+      node,
+      orderMatchRules(
+        [entry],
+        [{ source: KUBE_AGENT_PHRASE, count: 1, reason: 'not yet authored' }]
+      )
+    );
+    expect(regions).toEqual([]);
+    expect(shields.map(s => s.source)).toEqual([KUBE_AGENT_PHRASE]);
+    // A shield consumes, and it deliberately does NOT suppress the residual.
+    // ADR 0007 step 4 defines a residual as an occurrence that no CATALOG entry
+    // consumed, so the baseline still has to account for this phrase.
+    expect(residuals.map(r => r.run)).toEqual([KUBE_AGENT]);
+  });
+
+  it('lets a catalog entry win when it is at least as long as a baselined phrase', () => {
+    const code = `const e = <p>${KUBE_AGENT_PHRASE}</p>;`;
+    const node = visitNodes(code, 'x.tsx').filter(n => n.kind === 'jsxText')[0];
+    const shield = [
+      { source: KUBE_AGENT_PHRASE, count: 1, reason: 'not yet authored' },
+    ];
+
+    // Equal length: the catalog rule sorts first, so the owning child that
+    // catalogues the whole phrase takes the region back from its own baseline.
+    const exact = phrase({
+      source: KUBE_AGENT_PHRASE,
+      replacement: `${KUBE_AGENT} is already installed on the cluster.`,
+    });
+    const sameLength = matchNode(node, orderMatchRules([exact], shield));
+    expect(sameLength.regions.map(r => r.entry.source)).toEqual([
+      KUBE_AGENT_PHRASE,
+    ]);
+    expect(sameLength.shields).toEqual([]);
+    expect(sameLength.residuals).toEqual([]);
+
+    // Longer: the same, by length alone.
+    const longerNode = visitNodes(
+      `const e = <p>${KUBE_AGENT_PHRASE} already</p>;`,
+      'x.tsx'
+    ).filter(n => n.kind === 'jsxText')[0];
+    const longer = phrase({
+      source: `${KUBE_AGENT_PHRASE} already`,
+      replacement: 'nothing branded',
+    });
+    const longerResult = matchNode(
+      longerNode,
+      orderMatchRules([longer], shield)
+    );
+    expect(longerResult.regions.map(r => r.entry.source)).toEqual([
+      `${KUBE_AGENT_PHRASE} already`,
+    ]);
+    expect(longerResult.shields).toEqual([]);
   });
 
   it('reports a residual and excludes an occurrence inside an excluded host', () => {
@@ -258,7 +396,7 @@ describe('psiphonBrand matcher', () => {
       replacement:
         'You were logged out of Psiphon Access, but not out of ${connectorNameText}. See the Psiphon Access logs.',
     });
-    const { regions } = matchNode(node, sortLongestFirst([entry]));
+    const { regions } = matchNode(node, orderMatchRules([entry], []));
     expect(regions).toHaveLength(1);
     const edits = editsForRegion(node, regions[0]);
     // Two edits, one per quasi. The ${...} span is untouched.
@@ -280,7 +418,7 @@ describe('psiphonBrand matcher', () => {
       source: 'Added to ${name} Teleport Cluster.',
       replacement: 'Added to this Psiphon Access cluster.',
     });
-    const { regions } = matchNode(node, sortLongestFirst([entry]));
+    const { regions } = matchNode(node, orderMatchRules([entry], []));
     expect(() => editsForRegion(node, regions[0])).toThrow(
       /drops the template expression/
     );
@@ -293,7 +431,7 @@ describe('psiphonBrand matcher', () => {
       source: 'Join Teleport',
       replacement: 'Join <b>Psiphon Access</b>',
     });
-    const { regions } = matchNode(node, sortLongestFirst([entry]));
+    const { regions } = matchNode(node, orderMatchRules([entry], []));
     expect(() => editsForRegion(node, regions[0])).toThrow(
       /must not contain <, >, \{ or \}/
     );
@@ -306,7 +444,7 @@ describe('psiphonBrand matcher', () => {
       source: 'Teleport Home',
       replacement: "Psiphon's Home",
     });
-    const { regions } = matchNode(node, sortLongestFirst([entry]));
+    const { regions } = matchNode(node, orderMatchRules([entry], []));
     const edits = editsForRegion(node, regions[0]);
     expect(edits[0].text).toBe("Psiphon\\'s Home");
   });
@@ -344,17 +482,47 @@ describe('psiphonBrand transform', () => {
     expect(result!.map.sources).toContain('x.ts');
   });
 
+  it('does not rewrite inside a phrase another leaf has baselined', () => {
+    // The plugin and the gate must agree on what matched. If the plugin skipped
+    // the baseline it would half-rewrite a phrase the gate treats as untouched,
+    // and the shipped bundle would hold a sentence no catalog entry describes.
+    const sentence = 'Download and install Teleport Connect now';
+    const code = `const e = <p>${sentence}</p>;\n`;
+    const entry = phrase({
+      source: 'Teleport Connect',
+      replacement: 'Psiphon Access Connect',
+    });
+
+    const unshielded = applyBrandCatalog(code, 'x.tsx', [entry], []);
+    expect(unshielded!.code).toContain('Psiphon Access Connect');
+
+    const shielded = applyBrandCatalog(
+      code,
+      'x.tsx',
+      [entry],
+      [{ source: sentence, count: 1, reason: 'owned by another leaf' }]
+    );
+    expect(shielded).toBeNull();
+  });
+
   it('leaves a module alone when nothing matches', () => {
     expect(
       applyBrandCatalog("const a = 'nothing';\n", 'x.ts', [phrase()])
     ).toBeNull();
   });
 
-  it('leaves the real committed source alone, because every leaf is empty', () => {
-    // The whole point of the build-time transform: no committed UI source file
-    // changes its copy, and the 27 coupled assertions keep passing untouched.
+  it('never rewrites an immutable entry, whatever the leaves hold', () => {
+    // RENAMED on 2026-08-19. The old name was "leaves the real committed source
+    // alone, because every leaf is empty". That reason expires the moment an
+    // authoring child fills a leaf. The property that does not expire is that
+    // an immutable entry produces no edit, because its replacement equals its
+    // source, so this module keeps upstream wording at every catalog size.
     const code = "export const MFA_HEADER = 'Teleport-Mfa-Response';\n";
     expect(applyBrandCatalog(code, 'api.ts')).toBeNull();
+    for (const entry of BRAND_CATALOG.filter(e => e.immutable)) {
+      const module = `export const x = ${JSON.stringify(entry.source)};\n`;
+      expect(applyBrandCatalog(module, 'x.ts', [entry])).toBeNull();
+    }
   });
 });
 
@@ -404,11 +572,158 @@ describe('psiphonBrand gate, layer 1', () => {
     expect(evaluation.ratchetFailures).toEqual([]);
     expect(evaluation.unknownPhrases).toEqual([]);
 
-    expect(evaluation.counts.catalogEntries).toBe(5);
-    expect(evaluation.counts.pass).toBe(5);
+    // Derived from the data, never a literal. Every entry the aggregate holds
+    // reaches the gate, and every one of them passes.
+    expect(evaluation.counts.catalogEntries).toBe(BRAND_CATALOG.length);
+    expect(evaluation.counts.pass).toBe(evaluation.counts.catalogEntries);
+    expect(evaluation.entryResults).toHaveLength(BRAND_CATALOG.length);
+    expect(evaluation.entryResults.every(r => r.verdict === 'PASS')).toBe(true);
     expect(evaluation.counts.baselineEntries).toBe(BRAND_BASELINE.length);
     expect(evaluation.counts.baselined).toBe(BRAND_BASELINE.length);
     expect(evaluation.fileCount).toBeGreaterThan(1000);
+  });
+
+  it('passes for an AUTHORED leaf holding a render entry and a protocol entry', () => {
+    // The gate must be able to say yes. A machinery that only ever proves the
+    // empty catalog clean proves nothing about the work it exists to admit.
+    const { root, cleanup } = fixtureRepo({
+      'web/packages/teleport/src/Integrations/Enroll/Aws.tsx':
+        'export const A = () => <p>Add Teleport Resource Access</p>;\n',
+      'web/packages/teleport/src/Integrations/Enroll/policy.ts':
+        "export const NAME = 'TeleportDatabaseAccess';\n" +
+        "export const DOCS = 'https://goteleport.com/docs/aws';\n",
+    });
+    const authoredLeaf: readonly BrandPhrase[] = [
+      phrase({
+        source: 'Add Teleport Resource Access',
+        replacement: 'Add Psiphon Access Resource Access',
+        count: 1,
+        tier: 'render',
+        immutable: false,
+        reason: 'Button label a user reads on the AWS enrolment step',
+      }),
+      phrase({
+        source: 'TeleportDatabaseAccess',
+        replacement: 'TeleportDatabaseAccess',
+        count: 1,
+        tier: 'protocol',
+        immutable: true,
+        reason:
+          'IAM role name in the customer AWS account, a rename orphans it',
+      }),
+    ];
+    try {
+      expect(validateCatalog(authoredLeaf)).toEqual([]);
+      const evaluation = evaluateBrandGate(
+        authoredLeaf,
+        EMPTY_BASELINE,
+        EXCLUDED_HOSTS,
+        root
+      );
+      expect(evaluation.invalidEntries).toEqual([]);
+      expect(evaluation.deadEntries).toEqual([]);
+      expect(evaluation.countMismatches).toEqual([]);
+      expect(evaluation.ratchetFailures).toEqual([]);
+      expect(evaluation.unknownPhrases).toEqual([]);
+      expect(evaluation.counts.pass).toBe(authoredLeaf.length);
+      expect(evaluation.counts.baselineEntries).toBe(0);
+
+      // And the transform actually rewrites the render entry while leaving the
+      // protocol entry and the excluded host alone.
+      const rewritten = applyBrandCatalog(
+        'export const A = () => <p>Add Teleport Resource Access</p>;\n',
+        'Aws.tsx',
+        authoredLeaf,
+        []
+      );
+      expect(rewritten!.code).toContain('Add Psiphon Access Resource Access');
+      expect(
+        applyBrandCatalog(
+          "export const NAME = 'TeleportDatabaseAccess';\n",
+          'policy.ts',
+          authoredLeaf,
+          []
+        )
+      ).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('lets a baselined phrase in one leaf outrank a shorter entry in another', () => {
+    // DEFECT 2, at gate level. Before the shared ordering this raised
+    // RATCHET_FAIL against discover-enrolment, whose author never touched
+    // either file, so two children editing disjoint leaves broke each other.
+    const { root, cleanup } = fixtureRepo({
+      'web/packages/teleport/src/Discover/Kubernetes/Installed.tsx': `export const I = () => <p>${KUBE_AGENT_PHRASE}</p>;\n`,
+      'web/packages/teleport/src/Integrations/Enroll/chart.ts': `export const CHART = '${KUBE_AGENT}';\n`,
+    });
+    const integrationsLeaf = [
+      phrase({
+        source: KUBE_AGENT,
+        replacement: KUBE_AGENT,
+        count: 1,
+        tier: 'protocol',
+        immutable: true,
+        reason: 'Upstream helm chart name, a rename breaks the install command',
+      }),
+    ];
+    try {
+      const evaluation = evaluateBrandGate(
+        integrationsLeaf,
+        baselineOf('discover-enrolment', [
+          { source: KUBE_AGENT_PHRASE, count: 1, reason: 'not yet authored' },
+        ]),
+        EXCLUDED_HOSTS,
+        root
+      );
+      expect(evaluation.ratchetFailures).toEqual([]);
+      expect(evaluation.countMismatches).toEqual([]);
+      expect(evaluation.unknownPhrases).toEqual([]);
+      expect(evaluation.deadEntries).toEqual([]);
+      expect(evaluation.counts.baselined).toBe(1);
+
+      // The entry still counts every site where it legitimately wins, and only
+      // those. The site inside the baselined phrase belongs to the other leaf.
+      const result = evaluation.entryResults.find(
+        r => r.entry.source === KUBE_AGENT
+      );
+      expect(result!.verdict).toBe('PASS');
+      expect(result!.found).toBe(1);
+      expect(result!.sites.map(s => s.file)).toEqual([
+        'web/packages/teleport/src/Integrations/Enroll/chart.ts',
+      ]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('does not let a baseline shield hide a phrase upstream has just added', () => {
+    // The ordering must not become an exemption. A shield consumes, but it
+    // never suppresses a residual, so a NEW node that merely contains a
+    // baselined source is still UNKNOWN_PHRASE.
+    const { root, cleanup } = fixtureRepo({
+      'web/packages/teleport/src/Integrations/Enroll/chart.ts': `export const CHART = '${KUBE_AGENT}';\n`,
+      'web/packages/teleport/src/Integrations/Enroll/New.tsx': `export const N = () => <p>Now install ${KUBE_AGENT} on every cluster</p>;\n`,
+    });
+    try {
+      const evaluation = evaluateBrandGate(
+        [],
+        baselineOf('integrations-aws', [
+          { source: KUBE_AGENT, count: 1, reason: 'not yet authored' },
+        ]),
+        EXCLUDED_HOSTS,
+        root
+      );
+      expect(evaluation.counts.unknownPhrase).toBe(1);
+      expect(evaluation.unknownPhrases[0]).toContain(
+        `Now install ${KUBE_AGENT} on every cluster`
+      );
+      expect(evaluation.counts.baselined).toBe(1);
+      expect(evaluation.ratchetFailures).toEqual([]);
+    } finally {
+      cleanup();
+    }
   });
 
   it('is not vacuous: an unbaselined unbranded phrase raises UNKNOWN_PHRASE', () => {

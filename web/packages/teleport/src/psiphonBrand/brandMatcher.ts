@@ -29,8 +29,10 @@
 import { parse } from '@babel/parser';
 
 import {
+  BRAND_BASELINE,
   BRAND_WORD,
   EXCLUDED_HOSTS,
+  type BrandBaselineEntry,
   type BrandPhrase,
   type ExcludedHost,
 } from './brandCatalog';
@@ -73,6 +75,36 @@ export interface MatchRegion {
   readonly end: number;
 }
 
+/**
+ * A baselined phrase matched inside one visited node, in `matchText`
+ * coordinates. A shield consumes its region and rewrites nothing.
+ */
+export interface ShieldRegion {
+  readonly source: string;
+  readonly start: number;
+  readonly end: number;
+}
+
+/** A catalog entry, as one rule in the match ordering. */
+export interface CatalogRule {
+  readonly kind: 'catalog';
+  readonly source: string;
+  readonly entry: BrandPhrase;
+}
+
+/** A baselined phrase, as one rule in the match ordering. */
+export interface BaselineRule {
+  readonly kind: 'baseline';
+  readonly source: string;
+}
+
+/**
+ * One rule in the match ordering. A catalog rule can be rewritten. A baseline
+ * rule only consumes, so a shorter catalog entry cannot reach inside a phrase
+ * that another leaf has baselined.
+ */
+export type MatchRule = CatalogRule | BaselineRule;
+
 /** An occurrence of the brand word that no catalog entry consumed. */
 export interface ResidualOccurrence {
   /** Offset in `matchText`. */
@@ -84,6 +116,8 @@ export interface ResidualOccurrence {
 /** The result of matching one visited node. */
 export interface NodeMatchResult {
   readonly regions: readonly MatchRegion[];
+  /** Regions a baselined phrase took. Never rewritten, never a residual. */
+  readonly shields: readonly ShieldRegion[];
   readonly residuals: readonly ResidualOccurrence[];
 }
 
@@ -324,17 +358,74 @@ export function visitNodes(code: string, filePath: string): VisitedNode[] {
 
 /**
  * Sort entries longest source first, so a shorter entry never matches inside a
- * region a longer entry already took. Both readers call this, so both produce
- * the same counts.
+ * region a longer entry already took.
+ *
+ * This is the entry-only ordering. `bundleGate.ts` uses it, because a bundle
+ * holds replacement text and has no baseline. A reader that scans SOURCE must
+ * use `orderMatchRules` instead, so the baseline joins the ordering.
  */
 export function sortLongestFirst(
   entries: readonly BrandPhrase[]
 ): readonly BrandPhrase[] {
-  return [...entries].sort((a, b) => {
+  return [...entries].sort(
+    (a, b) => b.source.length - a.source.length || compareSource(a, b)
+  );
+}
+
+function compareSource(
+  a: { readonly source: string },
+  b: { readonly source: string }
+): number {
+  return a.source < b.source ? -1 : a.source > b.source ? 1 : 0;
+}
+
+/**
+ * Build the match ordering over a source tree: longest source first, so a
+ * shorter rule never matches inside a region a longer rule already took. Both
+ * source readers call this, so both produce the same counts.
+ *
+ * BASELINE ENTRIES PARTICIPATE IN THE SAME ORDERING AS CATALOG ENTRIES. ADR
+ * 0007 amendment 4. Without this, a short catalog entry in one leaf consumes a
+ * region inside a longer phrase baselined in a DIFFERENT leaf, that phrase
+ * loses its residual, and the gate raises RATCHET_FAIL against a leaf whose
+ * author never touched it. The measured case is the immutable identifier
+ * `teleport-kube-agent`, which sits inside the discover-enrolment baselined
+ * phrase `teleport-kube-agent is already installed on the cluster`.
+ *
+ * A baseline rule consumes and nothing else. It is never rewritten, and it
+ * never suppresses a residual, because ADR 0007 step 4 defines a residual as an
+ * occurrence THAT NO CATALOG ENTRY CONSUMED. A shield that suppressed a
+ * residual would let a brand-new upstream phrase through unnoticed.
+ *
+ * At equal source length a catalog rule sorts before a baseline rule, so a
+ * phrase that is in both wins as a catalog entry and the gate can report the
+ * RATCHET_FAIL that demands the baseline entry be removed.
+ */
+export function orderMatchRules(
+  entries: readonly BrandPhrase[],
+  baseline: readonly BrandBaselineEntry[] = BRAND_BASELINE
+): readonly MatchRule[] {
+  const rules: MatchRule[] = entries.map(entry => ({
+    kind: 'catalog',
+    source: entry.source,
+    entry,
+  }));
+  const seen = new Set<string>();
+  for (const entry of baseline) {
+    if (seen.has(entry.source)) {
+      continue;
+    }
+    seen.add(entry.source);
+    rules.push({ kind: 'baseline', source: entry.source });
+  }
+  return rules.sort((a, b) => {
     if (b.source.length !== a.source.length) {
       return b.source.length - a.source.length;
     }
-    return a.source < b.source ? -1 : a.source > b.source ? 1 : 0;
+    if (a.kind !== b.kind) {
+      return a.kind === 'catalog' ? -1 : 1;
+    }
+    return compareSource(a, b);
   });
 }
 
@@ -361,31 +452,38 @@ export function isExcludedByHost(
 }
 
 /**
- * Match a visited node against the catalog, then report every occurrence of the
- * brand word that no entry consumed and that no excluded host explains.
+ * Match a visited node against the ordering, then report every occurrence of
+ * the brand word that no CATALOG entry consumed and that no excluded host
+ * explains. A baseline rule takes its region out of reach of a shorter catalog
+ * rule, and it deliberately does not take the occurrence out of the residual
+ * set.
  *
- * `sortedEntries` must come from `sortLongestFirst`.
+ * `sortedRules` must come from `orderMatchRules`.
  */
 export function matchNode(
   node: VisitedNode,
-  sortedEntries: readonly BrandPhrase[],
+  sortedRules: readonly MatchRule[],
   hosts: readonly ExcludedHost[] = EXCLUDED_HOSTS
 ): NodeMatchResult {
   const text = node.matchText;
+  /** Taken by any rule. Decides what a later, shorter rule may still match. */
   const consumed = new Array<boolean>(text.length).fill(false);
+  /** Taken by a catalog rule. Decides what counts as a residual. */
+  const catalogConsumed = new Array<boolean>(text.length).fill(false);
   const regions: MatchRegion[] = [];
+  const shields: ShieldRegion[] = [];
 
-  for (const entry of sortedEntries) {
-    if (entry.source.length === 0) {
+  for (const rule of sortedRules) {
+    if (rule.source.length === 0) {
       continue;
     }
     let from = 0;
     for (;;) {
-      const at = text.indexOf(entry.source, from);
+      const at = text.indexOf(rule.source, from);
       if (at < 0) {
         break;
       }
-      const end = at + entry.source.length;
+      const end = at + rule.source.length;
       let free = true;
       for (let i = at; i < end; i++) {
         if (consumed[i]) {
@@ -397,7 +495,14 @@ export function matchNode(
         for (let i = at; i < end; i++) {
           consumed[i] = true;
         }
-        regions.push({ entry, start: at, end });
+        if (rule.kind === 'catalog') {
+          for (let i = at; i < end; i++) {
+            catalogConsumed[i] = true;
+          }
+          regions.push({ entry: rule.entry, start: at, end });
+        } else {
+          shields.push({ source: rule.source, start: at, end });
+        }
       }
       from = at + 1;
     }
@@ -407,7 +512,7 @@ export function matchNode(
   const lower = text.toLowerCase();
   let at = lower.indexOf(BRAND_WORD);
   while (at >= 0) {
-    if (!consumed[at]) {
+    if (!catalogConsumed[at]) {
       const run = runAround(text, at);
       if (!isExcludedByHost(run, hosts)) {
         residuals.push({ index: at, run });
@@ -417,7 +522,8 @@ export function matchNode(
   }
 
   regions.sort((a, b) => a.start - b.start);
-  return { regions, residuals };
+  shields.sort((a, b) => a.start - b.start);
+  return { regions, shields, residuals };
 }
 
 /** Escape a replacement so it is safe inside the node it lands in. */

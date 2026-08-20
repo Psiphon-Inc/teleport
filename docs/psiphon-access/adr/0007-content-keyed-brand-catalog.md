@@ -249,6 +249,52 @@ consumes each matched region. A shorter entry never matches inside a region
 that a longer entry already took. Both the plugin and the gate use the same
 sort, so both produce the same counts.
 
+**A BASELINE ENTRY JOINS THE SAME ORDERING.** This is amendment 4, made on
+2026-08-19. The first draft ordered catalog entries only, and that made the
+seven leaves depend on each other.
+
+The measured case: the immutable identifier `teleport-kube-agent` belongs in
+the integrations-aws leaf. It sits inside three phrases that the
+discover-enrolment leaf has baselined, one of which is
+`teleport-kube-agent is already installed on the cluster`. Under the first
+draft the short entry consumed the identifier inside the long phrase, the long
+phrase lost its residual, and the gate raised `RATCHET_FAIL` against
+discover-enrolment. The author of that leaf had touched neither file. Two
+children editing disjoint files broke each other, and the branch
+`agent/ref-o74l.3.3` stopped on exactly this.
+
+A baseline rule consumes and does nothing else. It is never rewritten, and it
+never suppresses a residual, because step 4 of the algorithm below defines a
+residual as an occurrence THAT NO CATALOG ENTRY CONSUMED. Keeping that
+definition is what stops the ordering from becoming an exemption: a phrase that
+upstream adds tomorrow still raises `UNKNOWN_PHRASE`, even when it contains a
+baselined source.
+
+At equal source length a catalog rule sorts before a baseline rule. A phrase
+that is in both therefore wins as a catalog entry, and the gate reports the
+`RATCHET_FAIL` that demands the baseline entry be removed.
+
+**What this does to a count.** A `count` is the number of sites where the entry
+is the longest winning rule. A site inside a baselined phrase belongs to the
+leaf that baselined the phrase, so it does not count for the shorter entry. The
+count is stable across the baseline-to-catalog transition, because the catalog
+entry that later replaces a baseline entry carries the same source text, so it
+has the same length and the same precedence. Nothing an authoring child
+measures today moves when another child catalogues its own phrase. Measured on
+2026-08-19 against `agent/ref-o74l.3.3` at `179905d467d`: 67 of its 68 entries
+keep the count their author measured, and `teleport-kube-agent` falls from 6 to
+3, which is the three sites that belong to discover-enrolment.
+
+Two alternatives were considered and rejected.
+
+- **Forbid a catalog entry shorter than a baselined phrase that contains it.**
+  This blocks a legitimate immutable identifier. `teleport-kube-agent` is the
+  upstream Helm chart name, and the catalog must hold it so the bundle layer
+  can tell it apart from a phrase somebody forgot.
+- **Let `RATCHET_FAIL` tolerate a consumed phrase.** This weakens the ratchet,
+  which is the only thing that stops the baseline rotting into a permanent
+  exemption.
+
 
 ## Worked examples
 
@@ -305,6 +351,38 @@ from the catalog. The scan set must cover it. Note also that line 21 of the
 same file repeats the phrase inside a documentation comment. The scanner
 visits literal and JSX nodes only, so the comment does not count and does not
 change.
+
+**Measured with the real matcher on 2026-08-19**, at commit `e94e5af620c`. The
+first two findings confirm the paragraphs above. The third corrects them.
+
+1. **The entry keys the constant, and the record was right about that.**
+   `constants.ts` yields two visited nodes. One is the string literal
+   `Teleport Identity Security` at line 22. Across the whole scan set exactly
+   one visited node holds the text `saves you from mistakes`: the JSX text node
+   at `PolicyPlaceholder.tsx:83`, whose normalised text is
+   `saves you from mistakes.` and which holds no brand word at all. No node
+   anywhere holds the rendered sentence, so no entry can key it.
+2. **Dropping the brand word renders `Identity Security saves you from
+   mistakes.`, and the record was right about that too.** The raw JSX text node
+   is `" saves you from mistakes."`, with a leading space, and
+   `PolicyPlaceholder.tsx:83` reads
+   `<H1 mb={2}>{FeatureName.IdentitySecurity} saves you from mistakes.</H1>`.
+   Rewriting the constant to `Identity Security` and re-reading the line gives
+   that sentence exactly.
+3. **CORRECTION: the count is 2, not 1, and the two sites sit in different
+   leaves.** Two visited nodes hold the text `Teleport Identity Security`:
+   the string literal at `design/src/constants.ts:22`, and a JSX text node at
+   `teleport/src/Roles/RoleEditor/RoleEditorVisualizer.tsx:85`. The area
+   classifier puts the first in `navigation-empty-dialogs` and the second in
+   `roles-users-tokens`. The baseline holds the phrase once, in
+   `navigation-empty-dialogs`, with `count: 2`, because a residual is grouped
+   by node text and the first file in sorted order decides the reported area.
+   So `navigation-empty-dialogs` owns this entry, and authoring it rewrites a
+   `Roles/` file that the `roles-users-tokens` author owns. The count is 2, and
+   an entry that declared 1 would raise `COUNT_MISMATCH`.
+
+Ten baseline sources have sites in more than one area. Leaf ownership follows
+the area of the first file in sorted order, not the area of every site.
 
 ### E4. One letter apart, and an upstream edition name
 
@@ -570,11 +648,15 @@ every `.ts` and `.tsx` file under `web/packages/teleport/src`,
    and not copy. This removes the identifier hazard and the
    import-path hazard by structure, with no pattern anywhere.
 3. **Match the catalog** against each visited node. Sort entries longest
-   source first. Compare a literal exactly. Normalise a JSX text node first.
-   Consume each matched region so a shorter entry cannot match inside a longer
-   one. Record the found count for each entry.
+   source first, WITH THE BASELINE ENTRIES IN THE SAME ORDERING. See "Longest
+   match first". Compare a literal exactly. Normalise a JSX text node first.
+   Consume each matched region so a shorter rule cannot match inside a longer
+   one. Record the found count for each catalog entry. A baseline rule records
+   nothing and rewrites nothing.
 4. **Find residuals.** In each visited node, find every remaining occurrence of
-   the word that no catalog entry consumed. Skip an occurrence when the
+   the word that no catalog entry consumed. A region that only a BASELINE rule
+   consumed is still a residual, which is what keeps the baseline countable and
+   keeps a new upstream phrase visible. Skip an occurrence when the
    surrounding run of non-whitespace, non-quote characters contains a host
    from `EXCLUDED_HOSTS`, which holds the single literal `goteleport.com`.
    That is a substring test against an explicit host, not a pattern over the
@@ -821,6 +903,11 @@ written and found four defects. The operator approved the first three on
    every `package.json` in the tree, which found no direct declaration. A
    direct import from the build package needs a declared dependency and a
    lockfile change. `ref-o74l.3.1` owns that.
+4. **The leaves were not independent.** A short catalog entry in one leaf
+   consumed a region inside a longer phrase baselined in another leaf, and the
+   other leaf took the `RATCHET_FAIL`. The operator approved the fix on
+   2026-08-19. Applied above, in "Longest match first" and in steps 3 and 4 of
+   the algorithm. `ref-o74l.3.7` owns it.
 
 A FOURTH PROPOSED CORRECTION WAS REJECTED, and the reason matters more than
 the correction. The planning pass argued that the catalog needs three immutable

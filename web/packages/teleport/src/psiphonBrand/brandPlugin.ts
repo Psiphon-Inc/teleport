@@ -38,12 +38,13 @@ import type { Plugin } from 'vite';
 import {
   BRAND_BASELINE,
   BRAND_CATALOG,
+  type BrandBaselineEntry,
   type BrandPhrase,
 } from './brandCatalog';
 import {
   editsForRegion,
   matchNode,
-  sortLongestFirst,
+  orderMatchRules,
   visitNodes,
 } from './brandMatcher';
 import {
@@ -102,9 +103,14 @@ export interface BrandTransformResult {
 export function applyBrandCatalog(
   code: string,
   filePath: string,
-  catalog: readonly BrandPhrase[] = BRAND_CATALOG
+  catalog: readonly BrandPhrase[] = BRAND_CATALOG,
+  baseline: readonly BrandBaselineEntry[] = BRAND_BASELINE
 ): BrandTransformResult | null {
-  const sorted = sortLongestFirst(catalog);
+  // The baseline joins the ordering, so the plugin and the gate agree on what
+  // matched. ADR 0007 amendment 4. Without the baseline here the plugin would
+  // rewrite part of a phrase that the gate treats as untouched, and the two
+  // readers would stop producing the same counts.
+  const sorted = orderMatchRules(catalog, baseline);
   const nodes = visitNodes(code, filePath);
   const magic = new MagicString(code);
   let edits = 0;

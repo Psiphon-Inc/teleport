@@ -41,7 +41,7 @@ import {
 } from './brandCatalog';
 import {
   matchNode,
-  sortLongestFirst,
+  orderMatchRules,
   visitNodes,
   type VisitedNode,
 } from './brandMatcher';
@@ -289,7 +289,12 @@ export function evaluateBrandGate(
   root: string = REPO_ROOT
 ): BrandGateEvaluation {
   const invalidEntries = validateCatalog(catalog);
-  const sorted = sortLongestFirst(catalog);
+  // The baseline joins the same longest-match-first ordering as the catalog.
+  // ADR 0007 amendment 4. Without this a short catalog entry in one leaf
+  // consumes a region inside a longer phrase baselined in a different leaf, and
+  // the gate raises RATCHET_FAIL against a leaf whose author never touched it.
+  const flatBaseline = BRAND_AREAS.flatMap(area => [...baselineByArea[area]]);
+  const sorted = orderMatchRules(catalog, flatBaseline);
 
   const files = collectScanSet(root);
   const foundByEntry = new Map<string, PhraseSite[]>();
