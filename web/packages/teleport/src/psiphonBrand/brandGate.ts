@@ -34,6 +34,7 @@ import {
   BRAND_CATALOG,
   BRAND_ENTRIES_BY_AREA,
   EXCLUDED_HOSTS,
+  PROTOCOL_ENTRIES,
   isBareBrandWord,
   isWholeNodeEntry,
   type BrandArea,
@@ -406,7 +407,7 @@ export function evaluateBrandGate(
       continue;
     }
     if (found !== entry.count) {
-      const where = sites.map(s => `${s.file}:${s.line}`).join(', ');
+      const where = sites.map(formatSiteWithArea).join(', ');
       const failureMessage = `COUNT_MISMATCH: catalog entry ${JSON.stringify(truncate(entry.source))} expects count ${entry.count} but the scanner found ${found}. Sites: ${where}.`;
       countMismatches.push(failureMessage);
       entryResults.push({
@@ -457,7 +458,8 @@ export function evaluateBrandGate(
         continue;
       }
       if (found !== entry.count) {
-        const failureMessage = `COUNT_MISMATCH: baselined phrase ${JSON.stringify(truncate(entry.source))} in area "${area}" expects count ${entry.count} but the scanner found ${found}. Upstream changed how often this phrase appears, so a human must look at the new site.`;
+        const where = bucket?.sites.map(formatSiteWithArea).join(', ') ?? '';
+        const failureMessage = `COUNT_MISMATCH: baselined phrase ${JSON.stringify(truncate(entry.source))} in area "${area}" expects count ${entry.count} but the scanner found ${found}. Sites: ${where}. Upstream changed how often this phrase appears, so a human must look at the new site.`;
         countMismatches.push(failureMessage);
         baselineResults.push({
           area,
@@ -520,6 +522,76 @@ export function evaluateBrandGate(
   };
 }
 
+function formatSiteWithArea(site: PhraseSite): string {
+  return `${site.file}:${site.line} [${areaForPath(site.file)}]`;
+}
+
+function catalogOwner(
+  source: string
+): BrandArea | 'protocol-machinery' | 'unassigned' {
+  for (const area of BRAND_AREAS) {
+    if (BRAND_ENTRIES_BY_AREA[area].some(entry => entry.source === source)) {
+      return area;
+    }
+  }
+  if (PROTOCOL_ENTRIES.some(entry => entry.source === source)) {
+    return 'protocol-machinery';
+  }
+  return 'unassigned';
+}
+
+function crossAreaLines(evaluation: BrandGateEvaluation): string[] {
+  const rows: Array<{
+    kind: 'baseline' | 'catalog';
+    owner: BrandArea | 'protocol-machinery' | 'unassigned';
+    source: string;
+    sites: readonly PhraseSite[];
+  }> = [];
+
+  for (const result of evaluation.entryResults) {
+    rows.push({
+      kind: 'catalog',
+      owner: catalogOwner(result.entry.source),
+      source: result.entry.source,
+      sites: result.sites,
+    });
+  }
+  for (const result of evaluation.baselineResults) {
+    const residual = evaluation.residuals.find(
+      candidate => candidate.source === result.entry.source
+    );
+    rows.push({
+      kind: 'baseline',
+      owner: result.area,
+      source: result.entry.source,
+      sites: residual?.sites ?? [],
+    });
+  }
+
+  const lines: string[] = [];
+  for (const row of rows
+    .filter(
+      row => new Set(row.sites.map(site => areaForPath(site.file))).size > 1
+    )
+    .sort(
+      (a, b) => a.kind.localeCompare(b.kind) || a.source.localeCompare(b.source)
+    )) {
+    lines.push(
+      `${row.kind} owner=${row.owner} total=${row.sites.length} source=${JSON.stringify(row.source)}`
+    );
+    for (const area of BRAND_AREAS) {
+      const sites = row.sites.filter(site => areaForPath(site.file) === area);
+      if (sites.length === 0) {
+        continue;
+      }
+      lines.push(
+        `  ${area} x${sites.length}: ${sites.map(site => `${site.file}:${site.line}`).join(', ')}`
+      );
+    }
+  }
+  return lines;
+}
+
 export function formatBrandReport(evaluation: BrandGateEvaluation): string {
   const lines: string[] = [];
   lines.push('=== Psiphon brand gate, layer 1 (source) ===');
@@ -544,6 +616,9 @@ export function formatBrandReport(evaluation: BrandGateEvaluation): string {
       `${area.padEnd(28)} entries=${String(entries).padStart(4)} baseline=${String(baseline).padStart(4)}`
     );
   }
+  lines.push('--- cross-area ownership and sites ---');
+  const crossArea = crossAreaLines(evaluation);
+  lines.push(...(crossArea.length > 0 ? crossArea : ['none']));
   for (const message of [
     ...evaluation.invalidEntries,
     ...evaluation.deadEntries,

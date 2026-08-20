@@ -34,6 +34,7 @@ import {
 } from './brandCatalog';
 import {
   areaForPath,
+  collectScanSet,
   evaluateBrandGate,
   formatBrandReport,
   isScanned,
@@ -269,6 +270,20 @@ describe('psiphonBrand scan set', () => {
       isScanned('web/packages/teleport/src/psiphonBrand/brandCatalog.ts')
     ).toBe(false);
     expect(isScanned('web/packages/teleterm/src/x.ts')).toBe(false);
+  });
+
+  it('sorts the scan set before ownership uses its first file', () => {
+    const { root, cleanup } = fixtureRepo({
+      'web/packages/teleport/src/Roles/Z.tsx': "export const Z = 'z';\n",
+      'web/packages/design/src/A.ts': "export const A = 'a';\n",
+      'web/packages/teleport/src/Discover/M.tsx': "export const M = 'm';\n",
+    });
+    try {
+      const files = collectScanSet(root);
+      expect(files).toEqual([...files].sort());
+    } finally {
+      cleanup();
+    }
   });
 
   it('maps every file to exactly one area, with a total fallback', () => {
@@ -1029,6 +1044,48 @@ describe('psiphonBrand gate, layer 1', () => {
     }
   });
 
+  it('reports each cross-area source with its owner and every site', () => {
+    const baselineSource = 'Cross-area Teleport phrase';
+    const { root, cleanup } = fixtureRepo({
+      'web/packages/teleport/src/Discover/Baseline.tsx': `export const A = () => <p>${baselineSource}</p>;\n`,
+      'web/packages/teleport/src/Roles/Baseline.tsx': `export const B = () => <p>${baselineSource}</p>;\n`,
+      'web/packages/shared/components/Catalog.tsx':
+        'export const C = () => <BrandName>Teleport</BrandName>;\n',
+      'web/packages/teleport/src/WorkloadIdentity/Catalog.tsx':
+        'export const D = () => <BrandName>Teleport</BrandName>;\n',
+    });
+    try {
+      const evaluation = evaluateBrandGate(
+        [
+          phrase({
+            source: 'Teleport',
+            replacement: 'Psiphon Access',
+            count: 2,
+            match: 'wholeNode',
+          }),
+        ],
+        baselineOf('discover-enrolment', [
+          { source: baselineSource, count: 2, reason: 'not yet authored' },
+        ]),
+        EXCLUDED_HOSTS,
+        root
+      );
+      const report = formatBrandReport(evaluation);
+      expect(report).toContain(
+        'catalog owner=roles-users-tokens total=2 source="Teleport"\n' +
+          '  bots-workload-identity x1: web/packages/teleport/src/WorkloadIdentity/Catalog.tsx:1\n' +
+          '  navigation-empty-dialogs x1: web/packages/shared/components/Catalog.tsx:1'
+      );
+      expect(report).toContain(
+        'baseline owner=discover-enrolment total=2 source="Cross-area Teleport phrase"\n' +
+          '  discover-enrolment x1: web/packages/teleport/src/Discover/Baseline.tsx:1\n' +
+          '  roles-users-tokens x1: web/packages/teleport/src/Roles/Baseline.tsx:1'
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
   it('is not vacuous: an unbaselined unbranded phrase raises UNKNOWN_PHRASE', () => {
     const { root, cleanup } = fixtureRepo({
       'web/packages/teleport/src/Roles/Fixture.tsx':
@@ -1172,8 +1229,12 @@ describe('psiphonBrand gate, layer 1', () => {
       expect(evaluation.counts.countMismatch).toBe(1);
       expect(evaluation.countMismatches[0]).toContain('expects count 1');
       expect(evaluation.countMismatches[0]).toContain('found 2');
-      expect(evaluation.countMismatches[0]).toContain('Roles/A.tsx:1');
-      expect(evaluation.countMismatches[0]).toContain('Roles/B.tsx:1');
+      expect(evaluation.countMismatches[0]).toContain(
+        'Roles/A.tsx:1 [roles-users-tokens]'
+      );
+      expect(evaluation.countMismatches[0]).toContain(
+        'Roles/B.tsx:1 [roles-users-tokens]'
+      );
     } finally {
       cleanup();
     }
@@ -1183,7 +1244,7 @@ describe('psiphonBrand gate, layer 1', () => {
     const { root, cleanup } = fixtureRepo({
       'web/packages/teleport/src/Roles/A.tsx':
         'export const A = () => <p>Add Teleport Resource Access</p>;\n',
-      'web/packages/teleport/src/Roles/B.tsx':
+      'web/packages/teleport/src/Discover/B.tsx':
         'export const B = () => <p>Add Teleport Resource Access</p>;\n',
     });
     try {
@@ -1196,6 +1257,12 @@ describe('psiphonBrand gate, layer 1', () => {
         root
       );
       expect(evaluation.counts.countMismatch).toBe(1);
+      expect(evaluation.countMismatches[0]).toContain(
+        'Discover/B.tsx:1 [discover-enrolment]'
+      );
+      expect(evaluation.countMismatches[0]).toContain(
+        'Roles/A.tsx:1 [roles-users-tokens]'
+      );
       expect(evaluation.countMismatches[0]).toContain('a human must look');
     } finally {
       cleanup();
