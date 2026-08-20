@@ -184,10 +184,70 @@ describe('psiphonBrand catalog shape', () => {
     }
   });
 
-  it('never holds the bare brand word as an entry source', () => {
+  it('never holds the bare brand word as a SUBSTRING entry source', () => {
+    // NARROWED on 2026-08-19, and not weakened. ADR 0007 decision 2 bans the
+    // bare word because a SUBSTRING rewrite of it corrupts an identifier, an
+    // import path and a documentation link. A whole-node exact match cannot
+    // reach any of those, because the visited node is the word and nothing
+    // else. So the ban keeps its full force in substring mode, which is the
+    // mode every entry is in unless it says otherwise, and a bare-word entry
+    // is legal only when it declares match: 'wholeNode'.
     for (const entry of BRAND_CATALOG) {
+      if (entry.match === 'wholeNode') {
+        continue;
+      }
       expect(entry.source.trim().toLowerCase()).not.toBe('teleport');
     }
+    for (const entry of BRAND_CATALOG.filter(
+      e => e.source.trim().toLowerCase() === 'teleport'
+    )) {
+      expect(entry.match).toBe('wholeNode');
+    }
+  });
+
+  it('rejects a bare-word entry that is allowed to match as a substring', () => {
+    // The ban test above states the property. This one proves the property is
+    // enforced and not merely declared, in the two places that could apply
+    // such an entry: the validator, and the rule builder every rewriter uses.
+    const banned = phrase({
+      source: 'Teleport',
+      replacement: 'Psiphon Access',
+    });
+    expect(validateCatalog([banned]).join('\n')).toMatch(
+      /bare brand word under substring matching/
+    );
+    expect(() => orderMatchRules([banned], [])).toThrow(
+      /does not declare match: 'wholeNode'/
+    );
+
+    // Lower case, and an entry that pads the word with whitespace, are the
+    // same entry as far as the ban is concerned.
+    expect(
+      validateCatalog([
+        phrase({
+          source: 'teleport',
+          replacement: 'teleport',
+          immutable: true,
+        }),
+      ]).join('\n')
+    ).toMatch(/bare brand word under substring matching/);
+    expect(() =>
+      orderMatchRules(
+        [phrase({ source: ' Teleport ', replacement: 'Psiphon Access' })],
+        []
+      )
+    ).toThrow(/bare brand word/);
+
+    // The same entry under whole-node matching is accepted by both.
+    const permitted = phrase({
+      source: 'Teleport',
+      replacement: 'Psiphon Access',
+      match: 'wholeNode',
+    });
+    expect(validateCatalog([permitted])).toEqual([]);
+    expect(orderMatchRules([permitted], []).map(rule => rule.source)).toEqual([
+      'Teleport',
+    ]);
   });
 });
 
@@ -376,6 +436,147 @@ describe('psiphonBrand matcher', () => {
     expect(longerResult.shields).toEqual([]);
   });
 
+  it('never matches a whole-node entry inside a longer phrase', () => {
+    // THE PROOF THAT MATTERS. If this regresses, the fork rewrites the bare
+    // word inside every phrase it does not own, including the hundreds still
+    // sitting in another leaf's baseline.
+    const bare = phrase({
+      source: 'Teleport',
+      replacement: 'Psiphon Access',
+      match: 'wholeNode',
+      count: 5,
+    });
+    const rules = orderMatchRules([bare], []);
+
+    const longer = [
+      'Welcome to Teleport',
+      'Teleport Users',
+      'to evaluate and use Teleport.',
+      'TeleportDatabaseAccess',
+      'Teleport-Mfa-Response',
+    ];
+    for (const text of longer) {
+      const node = visitNodes(`const a = ${JSON.stringify(text)};`, 'x.ts')[0];
+      expect(node.matchText).toBe(text);
+      const { regions, residuals } = matchNode(node, rules);
+      expect(regions).toEqual([]);
+      // Unmatched, so the phrase is still a residual its own leaf must account
+      // for. The whole-node entry neither rewrites it nor hides it.
+      expect(residuals).toHaveLength(1);
+    }
+
+    // And it does match the node that holds the word and nothing else, in each
+    // of the three visited kinds. These are the five real sites in miniature.
+    const exact: Array<[string, string]> = [
+      ['string', "const productName = beams ? 'Beams' : 'Teleport';"],
+      ['template', 'const t = `Teleport`;'],
+      ['jsxText', 'const e = <BrandName>Teleport</BrandName>;'],
+      // A JSX text node normalises to the bare word even when the formatter
+      // wrapped it and a {' '} follows, which is WorkloadIdentities.tsx:244.
+      [
+        'jsxText',
+        "const e = <p>\n      Teleport{' '}\n      <a>x</a>\n    </p>;",
+      ],
+    ];
+    for (const [kind, code] of exact) {
+      const node = visitNodes(code, 'x.tsx').filter(
+        n => n.kind === kind && n.matchText === 'Teleport'
+      )[0];
+      expect(node).toBeDefined();
+      const { regions, residuals } = matchNode(node, rules);
+      expect(regions.map(r => r.entry.source)).toEqual(['Teleport']);
+      expect(residuals).toEqual([]);
+      const edits = editsForRegion(node, regions[0]);
+      expect(edits).toHaveLength(1);
+      const out =
+        code.slice(0, edits[0].start) +
+        edits[0].text +
+        code.slice(edits[0].end);
+      expect(out).toContain('Psiphon Access');
+      expect(out).not.toContain('Teleport');
+    }
+
+    // The 'Beams' branch of the productName ternary is its own visited node,
+    // it holds no brand word, and nothing touches it.
+    const ternary = visitNodes(
+      "const productName = beams ? 'Beams' : 'Teleport';",
+      'x.ts'
+    );
+    expect(ternary.map(n => n.matchText)).toEqual(['Beams', 'Teleport']);
+    expect(matchNode(ternary[0], rules).regions).toEqual([]);
+  });
+
+  it('sorts a whole-node rule last by length and still lets it win its own node', () => {
+    // ADR 0007 amendment 4 orders every rule longest source first. A whole-node
+    // source is short, so it sorts at the end, which is what we want: any
+    // longer phrase that contains the word is claimed by its own rule first,
+    // and the whole-node rule can only ever take a node no other rule wanted.
+    const long = phrase({
+      source: 'Welcome to Teleport',
+      replacement: 'Welcome to Psiphon Access',
+    });
+    const bare = phrase({
+      source: 'Teleport',
+      replacement: 'Psiphon Access',
+      match: 'wholeNode',
+    });
+    const rules = orderMatchRules(
+      [bare, long],
+      [{ source: 'Teleport Users', count: 1, reason: 'another leaf' }]
+    );
+    expect(rules.map(r => `${r.source}|${r.kind}|${r.whole}`)).toEqual([
+      'Welcome to Teleport|catalog|false',
+      'Teleport Users|baseline|false',
+      'Teleport|catalog|true',
+    ]);
+
+    // The long entry takes its whole node, and the short rule gets nothing.
+    const longNode = visitNodes("const a = 'Welcome to Teleport';", 'x.ts')[0];
+    const longResult = matchNode(longNode, rules);
+    expect(longResult.regions.map(r => r.entry.source)).toEqual([
+      'Welcome to Teleport',
+    ]);
+
+    // A phrase another leaf baselined keeps its shield, and the whole-node rule
+    // does not reach inside it either.
+    const shielded = visitNodes("const a = 'Teleport Users';", 'x.ts')[0];
+    const shieldedResult = matchNode(shielded, rules);
+    expect(shieldedResult.regions).toEqual([]);
+    expect(shieldedResult.shields.map(s => s.source)).toEqual([
+      'Teleport Users',
+    ]);
+
+    // The bare node is still the whole-node rule's, even though it sorted last.
+    const bareNode = visitNodes("const a = 'Teleport';", 'x.ts')[0];
+    expect(matchNode(bareNode, rules).regions.map(r => r.entry.source)).toEqual(
+      ['Teleport']
+    );
+  });
+
+  it('keeps a whole-node entry out of the entry-only bundle ordering', () => {
+    // `bundleGate.ts` consumes a bundle by matching a replacement as a
+    // SUBSTRING, and a bundle has no nodes. An immutable whole-node entry whose
+    // replacement is the bare word would therefore account for every occurrence
+    // of the word in the bundle at once and hide hundreds of unaccounted
+    // phrases, which is the substring rewrite ADR 0007 decision 2 forbids.
+    const substring = phrase({ source: 'Teleport Users' });
+    const whole = phrase({
+      source: 'teleport',
+      replacement: 'teleport',
+      immutable: true,
+      tier: 'protocol',
+      match: 'wholeNode',
+    });
+    expect(sortLongestFirst([substring, whole]).map(e => e.source)).toEqual([
+      'Teleport Users',
+    ]);
+    // The source reader keeps it, because a source reader can see a node.
+    expect(orderMatchRules([substring, whole], []).map(r => r.source)).toEqual([
+      'Teleport Users',
+      'teleport',
+    ]);
+  });
+
   it('reports a residual and excludes an occurrence inside an excluded host', () => {
     const code = [
       "const a = 'Welcome to Teleport';",
@@ -503,6 +704,52 @@ describe('psiphonBrand transform', () => {
       [{ source: sentence, count: 1, reason: 'owned by another leaf' }]
     );
     expect(shielded).toBeNull();
+  });
+
+  it('rewrites a bare-word node and leaves every longer phrase alone', () => {
+    const code = [
+      "const productName = beams ? 'Beams' : 'Teleport';",
+      "const welcome = 'Welcome to Teleport';",
+      "const scheme = 'teleport';",
+      "const kind = { subKind: 'teleport' };",
+      'const e = <BrandName>Teleport</BrandName>;',
+      '',
+    ].join('\n');
+    const result = applyBrandCatalog(
+      code,
+      'x.tsx',
+      [
+        phrase({
+          source: 'Teleport',
+          replacement: 'Psiphon Access',
+          count: 2,
+          match: 'wholeNode',
+        }),
+        phrase({
+          source: 'teleport',
+          replacement: 'teleport',
+          count: 2,
+          tier: 'protocol',
+          immutable: true,
+          match: 'wholeNode',
+        }),
+      ],
+      []
+    );
+    expect(result!.code).toBe(
+      [
+        "const productName = beams ? 'Beams' : 'Psiphon Access';",
+        // Owned by another leaf, and still carrying upstream wording.
+        "const welcome = 'Welcome to Teleport';",
+        // Immutable. The deep-link scheme and the resource subKind must survive
+        // the build byte for byte.
+        "const scheme = 'teleport';",
+        "const kind = { subKind: 'teleport' };",
+        'const e = <BrandName>Psiphon Access</BrandName>;',
+        '',
+      ].join('\n')
+    );
+    expect(result!.edits).toBe(2);
   });
 
   it('leaves a module alone when nothing matches', () => {
@@ -721,6 +968,62 @@ describe('psiphonBrand gate, layer 1', () => {
       );
       expect(evaluation.counts.baselined).toBe(1);
       expect(evaluation.ratchetFailures).toEqual([]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('reports INVALID_ENTRY for a banned entry without reading a file', () => {
+    // ADR 0007 step 1 validates before it reads. The rule builder throws on
+    // this entry, so without the early return the gate would report one
+    // problem where it exists to report all of them.
+    const { root, cleanup } = fixtureRepo({
+      'web/packages/teleport/src/Roles/Fixture.tsx':
+        'export const F = () => <p>Welcome to Teleport</p>;\n',
+    });
+    try {
+      const evaluation = evaluateBrandGate(
+        [phrase({ source: 'Teleport', replacement: 'Psiphon Access' })],
+        EMPTY_BASELINE,
+        EXCLUDED_HOSTS,
+        root
+      );
+      expect(evaluation.counts.invalidEntry).toBe(1);
+      expect(evaluation.invalidEntries[0]).toContain(
+        'bare brand word under substring matching'
+      );
+      expect(evaluation.fileCount).toBe(0);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('passes a whole-node entry and still demands the longer phrase', () => {
+    const { root, cleanup } = fixtureRepo({
+      'web/packages/teleport/src/Roles/Bare.tsx':
+        'export const B = () => <BrandName>Teleport</BrandName>;\n',
+      'web/packages/teleport/src/Roles/Long.tsx':
+        'export const L = () => <p>Welcome to Teleport</p>;\n',
+    });
+    try {
+      const evaluation = evaluateBrandGate(
+        [
+          phrase({
+            source: 'Teleport',
+            replacement: 'Psiphon Access',
+            match: 'wholeNode',
+          }),
+        ],
+        EMPTY_BASELINE,
+        EXCLUDED_HOSTS,
+        root
+      );
+      expect(evaluation.invalidEntries).toEqual([]);
+      expect(evaluation.counts.pass).toBe(1);
+      // The longer phrase is untouched, so it is still UNKNOWN_PHRASE and its
+      // own leaf must account for it.
+      expect(evaluation.counts.unknownPhrase).toBe(1);
+      expect(evaluation.unknownPhrases[0]).toContain('Welcome to Teleport');
     } finally {
       cleanup();
     }

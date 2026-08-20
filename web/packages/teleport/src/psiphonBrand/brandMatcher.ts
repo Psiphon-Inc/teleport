@@ -32,6 +32,8 @@ import {
   BRAND_BASELINE,
   BRAND_WORD,
   EXCLUDED_HOSTS,
+  isBareBrandWord,
+  isWholeNodeEntry,
   type BrandBaselineEntry,
   type BrandPhrase,
   type ExcludedHost,
@@ -89,6 +91,8 @@ export interface ShieldRegion {
 export interface CatalogRule {
   readonly kind: 'catalog';
   readonly source: string;
+  /** True when the rule matches only a node whose whole text is the source. */
+  readonly whole: boolean;
   readonly entry: BrandPhrase;
 }
 
@@ -96,6 +100,8 @@ export interface CatalogRule {
 export interface BaselineRule {
   readonly kind: 'baseline';
   readonly source: string;
+  /** Always false. A baseline rule shields a region inside a node. */
+  readonly whole: false;
 }
 
 /**
@@ -363,13 +369,23 @@ export function visitNodes(code: string, filePath: string): VisitedNode[] {
  * This is the entry-only ordering. `bundleGate.ts` uses it, because a bundle
  * holds replacement text and has no baseline. A reader that scans SOURCE must
  * use `orderMatchRules` instead, so the baseline joins the ordering.
+ *
+ * A WHOLE-NODE ENTRY IS DROPPED HERE, and that is not an exemption. A bundle is
+ * one concatenated chunk with no nodes in it, so "the whole node equals the
+ * source" has no meaning there and the only thing the reader could do with such
+ * an entry is match it as a substring. For the bare word that is exactly the
+ * rewrite ADR 0007 decision 2 forbids, and it would let one immutable entry
+ * account for every occurrence of the word in the bundle at once, which would
+ * hide hundreds of unaccounted phrases. An occurrence a whole-node entry covers
+ * in source therefore stays unaccounted in the bundle until the bundle layer
+ * grows a reader that can see a node boundary.
  */
 export function sortLongestFirst(
   entries: readonly BrandPhrase[]
 ): readonly BrandPhrase[] {
-  return [...entries].sort(
-    (a, b) => b.source.length - a.source.length || compareSource(a, b)
-  );
+  return [...entries]
+    .filter(entry => !isWholeNodeEntry(entry))
+    .sort((a, b) => b.source.length - a.source.length || compareSource(a, b));
 }
 
 function compareSource(
@@ -400,23 +416,36 @@ function compareSource(
  * At equal source length a catalog rule sorts before a baseline rule, so a
  * phrase that is in both wins as a catalog entry and the gate can report the
  * RATCHET_FAIL that demands the baseline entry be removed.
+ *
+ * THIS FUNCTION IS THE CHOKE POINT FOR THE BARE-WORD BAN. Every reader that can
+ * rewrite source text builds its rules here, so refusing to CONSTRUCT a
+ * substring rule over the bare word is what makes the banned rule unreachable,
+ * rather than merely discouraged. An entry whose source is the bare word and
+ * that does not declare `match: 'wholeNode'` throws here, before a single file
+ * is read.
  */
 export function orderMatchRules(
   entries: readonly BrandPhrase[],
   baseline: readonly BrandBaselineEntry[] = BRAND_BASELINE
 ): readonly MatchRule[] {
-  const rules: MatchRule[] = entries.map(entry => ({
-    kind: 'catalog',
-    source: entry.source,
-    entry,
-  }));
+  const rules: MatchRule[] = entries.map(entry => {
+    const whole = isWholeNodeEntry(entry);
+    if (!whole && isBareBrandWord(entry.source)) {
+      throw new Error(
+        `Brand entry ${JSON.stringify(entry.source)} is the bare brand word and does not declare match: 'wholeNode'. ` +
+          'ADR 0007 decision 2 forbids a substring rule over the bare word, because it would rewrite inside an identifier, an import path and a documentation link. ' +
+          "Declare match: 'wholeNode', which matches only a visited node whose entire text is the word, or key the entry on a longer phrase."
+      );
+    }
+    return { kind: 'catalog', source: entry.source, whole, entry };
+  });
   const seen = new Set<string>();
   for (const entry of baseline) {
     if (seen.has(entry.source)) {
       continue;
     }
     seen.add(entry.source);
-    rules.push({ kind: 'baseline', source: entry.source });
+    rules.push({ kind: 'baseline', source: entry.source, whole: false });
   }
   return rules.sort((a, b) => {
     if (b.source.length !== a.source.length) {
@@ -484,6 +513,13 @@ export function matchNode(
         break;
       }
       const end = at + rule.source.length;
+      // A whole-node rule matches only when the source IS the node. This is
+      // what confines a bare-word entry to the 5 nodes that hold nothing else,
+      // and it is why `Welcome to Teleport` is out of its reach.
+      if (rule.whole && (at !== 0 || end !== text.length)) {
+        from = at + 1;
+        continue;
+      }
       let free = true;
       for (let i = at; i < end; i++) {
         if (consumed[i]) {

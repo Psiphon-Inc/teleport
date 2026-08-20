@@ -28,7 +28,18 @@
 import type { BrandBaselineEntry, BrandPhrase } from '../brandCatalog';
 
 /** Catalog entries for this area. Empty until an authoring child fills it. */
-export const ROLES_USERS_TOKENS_ENTRIES: readonly BrandPhrase[] = [];
+export const ROLES_USERS_TOKENS_ENTRIES: readonly BrandPhrase[] = [
+  {
+    source: 'Teleport',
+    replacement: 'Psiphon Access',
+    count: 5,
+    tier: 'render',
+    immutable: false,
+    match: 'wholeNode',
+    reason:
+      'The product name standing alone in copy, at five visited nodes that hold the word and nothing else: the <BrandName> label in shared/components/AccessRequests/ReviewRequests/RequestView/RequestView.tsx, the diagram label in shared/components/LatencyDiagnostic/LatencyDiagnostic.tsx, the info-guide sentence in teleport/src/WorkloadIdentity/WorkloadIdentities.tsx, and the non-Beams branch of productName in teleport/src/Welcome/Welcome.tsx and teleport/src/components/Passkeys/PasskeyBlurb.tsx. Whole-node matching keeps it out of every longer phrase, which is why it cannot reach Welcome to Teleport',
+  },
+];
 
 /**
  * Phrases in this area that reach a user and that no catalog entry covers yet.
@@ -75,12 +86,6 @@ export const ROLES_USERS_TOKENS_BASELINE: readonly BrandBaselineEntry[] = [
     count: 1,
     reason:
       'Not yet authored. Upstream wording reaches a user from teleport/src/Roles/PolicyPlaceholder.tsx',
-  },
-  {
-    source: 'Teleport',
-    count: 5,
-    reason:
-      'Not yet authored. Upstream wording reaches a user from shared/components/AccessRequests/ReviewRequests/RequestView/RequestView.tsx, shared/components/LatencyDiagnostic/LatencyDiagnostic.tsx, teleport/src/Welcome/Welcome.tsx',
   },
   {
     source: 'Teleport Documentation.',

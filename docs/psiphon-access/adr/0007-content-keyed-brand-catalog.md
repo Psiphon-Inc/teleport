@@ -1019,6 +1019,113 @@ Both facts are true at the same time and both need an answer before the last
 authoring child lands.
 
 
+## Amendment 7. The bare word, permitted under a whole-node exact match, made on 2026-08-19
+
+Amendment 6 named an obstacle that stops the source baseline reaching zero. Two
+baseline entries hold the bare word on its own, `Teleport` at 5 sites and
+`teleport` at 22. Decision 2 forbids the bare word as a catalog source, so no
+authoring child could move those 27 sites. This amendment removes the obstacle.
+
+**What decision 2 actually forbids.** The reasoning behind it is a reasoning
+about SUBSTRING matching. A substring rewrite of the bare word reaches inside
+an identifier, an import path and a documentation link, and the three measured
+examples in "Why no regular expression over the bare word" are all of that
+shape. The reasoning does not hold for a WHOLE-NODE EXACT MATCH, where the
+entire visited node is the word and nothing else. Such a rewrite cannot reach
+outside the node, because the node holds nothing else to reach.
+
+**The decision.** A bare-word source is legal in the catalog under whole-node
+matching, and under nothing else. Decision 2 keeps its full force everywhere
+else.
+
+**The mechanism.** `BrandPhrase` gains one optional field, `match`, with the
+values `substring` and `wholeNode`. An entry that omits it is a substring entry,
+so every entry written before this amendment keeps its meaning. Four guards make
+the banned combination unreachable.
+
+1. `validateCatalog` reports `INVALID_ENTRY` for a bare-word source that does
+   not declare `wholeNode`. `evaluateBrandGate` returns that verdict before it
+   reads a file, which is what step 1 of the algorithm asks for.
+2. `orderMatchRules` THROWS on the same entry. This is the choke point. Every
+   reader that can rewrite source text builds its rules there, so the banned
+   rule cannot be constructed, let alone applied.
+3. `matchNode` accepts a whole-node rule only when the match starts at offset 0
+   and ends at the end of the node text.
+4. `sortLongestFirst` drops a whole-node entry. That ordering serves the bundle
+   reader, a bundle has no nodes, and the only thing the bundle reader could do
+   with such an entry is match it as a substring. An immutable bare-word entry
+   used that way would account for every occurrence of the word in the bundle at
+   once and hide hundreds of unaccounted phrases.
+
+The type system carries the discriminant and no more. TypeScript cannot subtract
+a string literal from the type `string`, so the field alone cannot make the
+wrong entry unrepresentable. Guard 2 completes the job at the only place that
+turns an entry into a rule.
+
+**The ban test narrows and does not weaken.** It still fails for a bare-word
+entry that is allowed to match as a substring. A second test proves the
+validator and the rule builder both refuse that entry, so the property is
+enforced and not merely declared.
+
+**Interaction with amendment 4.** A whole-node source is short, so it sorts at
+the end of the longest-match-first ordering. That is the wanted position. Every
+longer phrase, catalog or baseline, claims its region first, and the whole-node
+rule can only take a node that no other rule wanted. The position is not what
+confines the rule. Guard 3 confines it, and a node whose whole text is the word
+is too short for any longer rule to fit inside. Measured: with the two entries
+landed, all 349 remaining baseline entries still match, and no leaf count moved.
+No catalog source is shorter than the bare word, so removing the two bare-word
+baseline shields freed no other rule.
+
+**The 27 sites, re-opened one by one on 2026-08-19.** The split is 5 and 22.
+
+The 5 capital-T sites are all copy, and they become one `render` entry with the
+replacement `Psiphon Access`. They are the `<BrandName>` label in
+`shared/components/AccessRequests/ReviewRequests/RequestView/RequestView.tsx`,
+the diagram label in `shared/components/LatencyDiagnostic/LatencyDiagnostic.tsx`,
+the info-guide sentence in `teleport/src/WorkloadIdentity/WorkloadIdentities.tsx`,
+and the non-Beams branch of `productName` in `teleport/src/Welcome/Welcome.tsx`
+and `teleport/src/components/Passkeys/PasskeyBlurb.tsx`. The `Beams` branch is a
+separate visited node, it holds no brand word, and nothing touches it.
+
+The 22 lower-case sites are none of them copy, and they become one `protocol`
+entry whose replacement equals its source. They carry six distinct uses, not
+three. The deep-link URL scheme `CUSTOM_PROTOCOL` in `shared/deepLinks.ts`. The
+resource subKind of an SSH node, at 14 fixtures in
+`teleport/src/Nodes/fixtures/index.ts` and 1 in
+`shared/hooks/useInfiniteScroll/testUtils.ts`, which is 15 and not the 19 an
+earlier count reported. The default GitHub repository name at two sites in
+`teleport/src/Bots/Add/GitHubActionsK8s/useGitHubK8sFlow.tsx`, which completes
+`gravitational/teleport`. The binary name in `<Mark>teleport</Mark>` at
+`teleport/src/Bots/InfoGuide.tsx`, which a user types. The default Kubernetes
+namespace placeholder at
+`teleport/src/Discover/Kubernetes/SelfHosted/HelmChart/HelmChart.tsx`, which
+matches the upstream chart default. The mock cluster name in
+`teleport/src/SessionRecordings/mock.ts` and
+`teleport/src/SessionRecordings/list/mock.ts`. The last three uses were not in
+the earlier count. The entry is `protocol` tier because that is the strictest
+tier and it forces immutability on all six uses at once. One of the six, the
+binary name, is `interface` tier by the table above. A content-keyed entry
+carries one tier, and the stricter tier is the safe one.
+
+**Measured on a real build.** The build ran with
+`tool/teleport-google/assets/build-ui.sh` and exited 0. Strict mode stays off,
+because 349 source baseline entries remain. The transform rewrote 54 occurrences
+in 30 modules, against 50 in 26 before, so the 5 render sites added 4 edits in 4
+modules. The fifth, `RequestView.tsx`, is absent from the OSS app bundle, and it
+held no occurrence in that bundle before the change either. In the emitted
+`app/app.js` the count of `Psiphon Access` rose from 59 to 63 and the count of
+the brand word fell from 763 to 759. `Welcome to Teleport` still appears once,
+because it belongs to another leaf and is still baselined. Every one of the 349
+lower-case occurrence contexts in the bundle is byte for byte identical before
+and after.
+
+**What this amendment does not close.** The three CSS-namespace occurrences and
+the `?raw` YAML template in amendment 6 are still open, and 349 baseline entries
+remain, so strict enforcement is still off. This amendment removes one blocker
+and not the rest.
+
+
 ## A correction to this record's own assumption
 
 This record assumed the residual occurrences in the bundle were not copy.

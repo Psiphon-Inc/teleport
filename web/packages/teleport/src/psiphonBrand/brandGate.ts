@@ -34,6 +34,8 @@ import {
   BRAND_CATALOG,
   BRAND_ENTRIES_BY_AREA,
   EXCLUDED_HOSTS,
+  isBareBrandWord,
+  isWholeNodeEntry,
   type BrandArea,
   type BrandBaselineEntry,
   type BrandPhrase,
@@ -269,12 +271,57 @@ export function validateCatalog(
     if (entry.reason.trim().length === 0) {
       problems.push(`INVALID_ENTRY: ${label} has an empty reason.`);
     }
+    // The narrowed bare-word ban. ADR 0007 decision 2 forbids the bare word as
+    // a catalog source because a SUBSTRING rewrite of it would corrupt an
+    // identifier, an import path and a documentation link. A whole-node exact
+    // match cannot reach any of those, because the whole visited node is the
+    // word and nothing else. So the ban narrows to the substring mode, and it
+    // stays absolute there.
+    if (isBareBrandWord(entry.source) && !isWholeNodeEntry(entry)) {
+      problems.push(
+        `INVALID_ENTRY: ${label} is the bare brand word under substring matching. ADR 0007 decision 2 forbids that, because a substring rewrite of the bare word reaches inside an identifier, an import path and a documentation link. Declare match: 'wholeNode' to key the entry on a node that holds the word and nothing else.`
+      );
+    }
   });
   return problems;
 }
 
 function truncate(text: string, max = 120): string {
   return text.length <= max ? text : text.slice(0, max) + '...';
+}
+
+/** The verdict when step 1 already failed and no file was read. */
+function emptyEvaluation(
+  catalog: readonly BrandPhrase[],
+  baselineByArea: Readonly<Record<BrandArea, readonly BrandBaselineEntry[]>>,
+  invalidEntries: readonly string[]
+): BrandGateEvaluation {
+  return {
+    fileCount: 0,
+    nodeCount: 0,
+    entryResults: [],
+    baselineResults: [],
+    residuals: [],
+    invalidEntries,
+    countMismatches: [],
+    deadEntries: [],
+    unknownPhrases: [],
+    ratchetFailures: [],
+    counts: {
+      catalogEntries: catalog.length,
+      baselineEntries: BRAND_AREAS.reduce(
+        (n, area) => n + baselineByArea[area].length,
+        0
+      ),
+      pass: 0,
+      invalidEntry: invalidEntries.length,
+      countMismatch: 0,
+      deadEntry: 0,
+      unknownPhrase: 0,
+      ratchetFail: 0,
+      baselined: 0,
+    },
+  };
 }
 
 /**
@@ -289,6 +336,14 @@ export function evaluateBrandGate(
   root: string = REPO_ROOT
 ): BrandGateEvaluation {
   const invalidEntries = validateCatalog(catalog);
+  if (invalidEntries.length > 0) {
+    // ADR 0007 step 1: validate the catalog BEFORE reading a file. Stopping
+    // here also keeps the report readable when an entry is one the rule builder
+    // refuses to construct, such as the bare word under substring matching.
+    // `orderMatchRules` throws on that entry, and a throw would report one
+    // problem where the gate exists to report all of them.
+    return emptyEvaluation(catalog, baselineByArea, invalidEntries);
+  }
   // The baseline joins the same longest-match-first ordering as the catalog.
   // ADR 0007 amendment 4. Without this a short catalog entry in one leaf
   // consumes a region inside a longer phrase baselined in a different leaf, and

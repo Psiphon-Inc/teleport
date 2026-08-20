@@ -67,6 +67,22 @@ import {
 export type BrandTier = 'render' | 'interface' | 'protocol';
 
 /**
+ * How a source is matched against a visited node.
+ *
+ * - `substring`, the default: the source may match anywhere inside a node.
+ * - `wholeNode`: the source matches ONLY when it is the entire node text.
+ *
+ * ADR 0007 decision 2 forbids the bare word as a catalog source. That reasoning
+ * is a reasoning about SUBSTRING matching: a substring rewrite of the bare word
+ * would reach inside an identifier, an import path and a documentation link.
+ * The reasoning does not hold for a whole-node exact match, where the visited
+ * node is the bare word and nothing else, so the rewrite cannot reach anything
+ * the node does not already own. `wholeNode` is the narrow permission, and it
+ * is the ONLY way a bare-word source can enter the catalog.
+ */
+export type BrandMatch = 'substring' | 'wholeNode';
+
+/**
  * One catalog entry. The entry is keyed on string content and never on a file,
  * a line or a context. The type declares no `pattern` field and no `regex`
  * field, and `source` has the type `string`, so no entry can hold a pattern.
@@ -84,6 +100,30 @@ export interface BrandPhrase {
   readonly immutable: boolean;
   /** One sentence. Mandatory on every entry. */
   readonly reason: string;
+  /**
+   * How the source is matched. Absent means `substring`, which is what every
+   * entry written before 2026-08-19 is. TypeScript cannot subtract a literal
+   * from `string`, so this field cannot by itself make a bare-word substring
+   * entry unrepresentable. `orderMatchRules` completes the guard: it refuses to
+   * BUILD a substring rule over the bare word, and every reader that can
+   * rewrite source text builds its rules there.
+   */
+  readonly match?: BrandMatch;
+}
+
+/**
+ * True when a source is the bare brand word and nothing else. Such a source is
+ * legal ONLY under `match: 'wholeNode'`. `validateCatalog` reports it and
+ * `orderMatchRules` refuses to build a substring rule from it, so the illegal
+ * combination cannot reach a rewriter by any path.
+ */
+export function isBareBrandWord(source: string): boolean {
+  return source.trim().toLowerCase() === BRAND_WORD;
+}
+
+/** True when this entry matches only the whole visited node. */
+export function isWholeNodeEntry(entry: BrandPhrase): boolean {
+  return entry.match === 'wholeNode';
 }
 
 /**

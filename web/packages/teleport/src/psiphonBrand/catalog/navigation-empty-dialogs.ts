@@ -28,7 +28,18 @@
 import type { BrandBaselineEntry, BrandPhrase } from '../brandCatalog';
 
 /** Catalog entries for this area. Empty until an authoring child fills it. */
-export const NAVIGATION_EMPTY_DIALOGS_ENTRIES: readonly BrandPhrase[] = [];
+export const NAVIGATION_EMPTY_DIALOGS_ENTRIES: readonly BrandPhrase[] = [
+  {
+    source: 'teleport',
+    replacement: 'teleport',
+    count: 22,
+    tier: 'protocol',
+    immutable: true,
+    match: 'wholeNode',
+    reason:
+      'NONE OF THESE 22 NODES IS COPY, and every one of them names something outside this fork that a rename would break. They are: the deep-link URL scheme CUSTOM_PROTOCOL in shared/deepLinks.ts, which every teleport:// link depends on; the resource subKind of an SSH node, at 14 fixtures in teleport/src/Nodes/fixtures/index.ts and one in shared/hooks/useInfiniteScroll/testUtils.ts, which the backend sends and the UI switches on; the default GitHub repository name in teleport/src/Bots/Add/GitHubActionsK8s/useGitHubK8sFlow.tsx, which completes gravitational/teleport and names an upstream repository; the <Mark>teleport</Mark> binary name in teleport/src/Bots/InfoGuide.tsx, which a user types; the default Kubernetes namespace placeholder in teleport/src/Discover/Kubernetes/SelfHosted/HelmChart/HelmChart.tsx, which matches the upstream chart default; and the mock cluster name in teleport/src/SessionRecordings/mock.ts and teleport/src/SessionRecordings/list/mock.ts. Protocol tier because it is the strictest tier and forces immutability on all six uses at once',
+  },
+];
 
 /**
  * Phrases in this area that reach a user and that no catalog entry covers yet.
@@ -265,12 +276,6 @@ export const NAVIGATION_EMPTY_DIALOGS_BASELINE: readonly BrandBaselineEntry[] =
       count: 1,
       reason:
         'Not yet authored. Upstream wording reaches a user from teleport/src/components/PoweredByTeleportLogo/PoweredByTeleportLogo.tsx',
-    },
-    {
-      source: 'teleport',
-      count: 22,
-      reason:
-        'Not yet authored. Upstream wording reaches a user from shared/deepLinks.ts, shared/hooks/useInfiniteScroll/testUtils.ts, teleport/src/Bots/Add/GitHubActionsK8s/useGitHubK8sFlow.tsx',
     },
     {
       source: 'teleport-logo',
