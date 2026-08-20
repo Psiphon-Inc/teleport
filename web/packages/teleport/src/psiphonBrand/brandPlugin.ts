@@ -48,6 +48,7 @@ import {
   visitNodes,
 } from './brandMatcher';
 import {
+  assertBundleBaselineHealth,
   formatBundleReport,
   isBundleGateStrict,
   scanBundleResidual,
@@ -179,13 +180,17 @@ export function psiphonBrandPlugin(): Plugin {
       }
 
       const strict = isBundleGateStrict();
+      // The bundle exclusion list has its own ratchet, and it runs in both
+      // modes. A record that stopped matching fails the build here, before
+      // anything else is judged, so the list can only shrink.
+      const verdict = assertBundleBaselineHealth(results);
       const unaccounted = results.reduce(
         (n, r) => n + r.residualOccurrences,
         0
       );
       const report =
         `psiphon-brand: rewrote ${appliedEdits} occurrences in ${transformedModules} modules.\n` +
-        formatBundleReport(results, strict);
+        formatBundleReport(results, strict, 25, verdict);
 
       if (strict && unaccounted > 0) {
         throw new Error(
