@@ -1126,6 +1126,90 @@ remain, so strict enforcement is still off. This amendment removes one blocker
 and not the rest.
 
 
+## Amendment 8. The last four occurrences, closed on 2026-08-19
+
+Amendment 6 named four occurrences that survive when every source baseline is
+empty and every catalog leaf is full. `ref-o74l.3.6` closed all four. The
+faithful simulation, which empties all seven baselines and generates one catalog
+entry per baseline source, measured 14 unaccounted occurrences before the change
+and 10 after. The four this record names are the difference.
+
+**The three CSS namespace occurrences.** THE OPERATOR DECIDED ON 2026-08-19 TO
+KEEP THE NAMESPACE AS `teleport`. It is a `@gravitational/design-system`
+dependency boundary and the cost of a rename is not worth it. The three are
+therefore permanently accepted and need a home.
+
+They cannot go in `BUNDLE_EXCLUSIONS`. That type rejects any token no longer than
+the brand word, and that guard is the only thing standing between the exclusion
+list and a record that swallows every `Teleport` in the product. The guard stays.
+Instead `bundleBaseline.ts` gains a third list, `BUNDLE_NAMESPACE_LITERALS`, with
+the OPPOSITE length rule. Neither rule is a relaxation of the other, and together
+they leave no way to express a key that matches a phrase.
+
+Three conditions must hold at once, and the first two are not configurable.
+
+1. `literal` must EQUAL the bare lower-case brand word. The set of literals a
+   record can express has exactly one member, so `Teleport` is unexpressible and
+   so is every phrase.
+2. The character before the match and the character after it must be the SAME
+   quote. The match is a complete string literal, never a word inside one.
+   `"Welcome to teleport"` fails this, because the character before the word is a
+   space. This condition is load-bearing: a rule keyed on token equality alone
+   WOULD have admitted that phrase, because the token scan stops at whitespace.
+3. An exact `anchor` must immediately precede the opening quote, and the anchor
+   must end in one of `:` `[` `,` `(` `=`. It is compared for equality and is
+   never a pattern. An anchor cannot end in a letter, so a record cannot name the
+   tail of a sentence.
+
+The anchor also keeps the mechanism from taking another record's decision. The
+same build holds five OTHER whole-string bare words, at `placeholder:`,
+`children:`, `SNe=`, `repository||` and `repository??`. They come from
+first-party modules in the layer 1 scan set, and amendment 7 accounts for them as
+part of the 22 bare-word source sites. The three shipped anchors,
+`cssVarsPrefix:`, `name:` and `,[`, each match exactly one occurrence and none of
+those five.
+
+WHAT THIS MECHANISM COULD ADMIT THAT IT SHOULD NOT, stated plainly: a
+user-visible string whose whole text is the single lower-case word `teleport`, at
+one of the three anchored positions. A one-word label, placeholder or tooltip is
+the realistic case. Two things bound it. Every record names its site, so a reader
+can check it. And `count` is a HARD CAP, unlike the count on a `BundleExclusion`:
+a record that matches more often than it records raises `BUNDLE_CAP_FAIL` and
+stops the build. Overflow is fatal in both report mode and strict mode, for the
+same reason the presence ratchet is.
+
+**The one line of copy.** `AuthConnectors/templates/github.yaml:16` reaches the
+bundle through `?raw`, so neither the layer 1 scan set nor the transform sees it.
+It is copy, so it could never enter an exclusion list. The choice was to grow the
+transform or to edit the line, and the family was measured first: 17 `?raw`
+imports across 4 modules, every one of them a `.yaml`, 2 assets holding the brand
+word, and 1 of those 2 holding it only inside `goteleport.com`, which
+`EXCLUDED_HOSTS` already accounts. One file and one line. The fork edits the line.
+Growing the transform would also have needed a text-matching path in the matcher
+and authored replacement copy in a catalog leaf, which is machinery and copy for a
+family of one.
+
+TWO THINGS WATCH THAT LINE. Layer 2 already did: a `?raw` asset ships its text
+verbatim, so the word returning raises an unaccounted run in strict mode. What
+layer 2 cannot do is name the file. `bundleGate.test.ts` therefore reads every
+`?raw` asset the source declares, applies the same host exclusion, and fails with
+the path and the line number. It discovers the imports by reading the source, so a
+new `?raw` import is covered the day it lands.
+
+**WHAT STILL STOPS STRICT MODE, and it is none of the above.** The simulation
+leaves 10 unaccounted occurrences, and all 10 are one class.
+`scanBundleResidual` consumes a catalog occurrence by searching the bundle for
+`entry.replacement`. When an entry's source is a template literal WITH `${...}`
+expressions and its replacement RETAINS the brand word, that search cannot
+succeed, because the catalog holds `${moduleSrc}` and the minified bundle holds
+`${i}`. The `integrations-aws` leaf, which landed at `af6effd41a2` after amendment
+6 was measured, has 20 entries of 64 whose replacement keeps the word, correctly:
+they are upstream Terraform module variable names and an AWS IAM trust-policy
+audience. Layer 2 must learn to consume such an entry by its quasis rather than by
+its whole replacement text. That is the last known bundle-side obstacle, and it is
+tracked separately. The other obstacle amendment 6 recorded, the 27 bare-word
+source sites, was closed by amendment 7.
+
 ## A correction to this record's own assumption
 
 This record assumed the residual occurrences in the bundle were not copy.
