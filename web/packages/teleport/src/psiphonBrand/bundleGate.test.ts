@@ -28,22 +28,30 @@
  */
 
 import { execFileSync } from 'child_process';
-import { resolve } from 'path';
+import { readdirSync, readFileSync } from 'fs';
+import { dirname, join, relative, resolve } from 'path';
 
+import { EXCLUDED_HOSTS } from './brandCatalog';
+import { isExcludedByHost } from './brandMatcher';
 import { psiphonBrandPlugin } from './brandPlugin';
 import {
   BUNDLE_CATEGORY_RULES,
   BUNDLE_EXCLUSIONS,
+  BUNDLE_NAMESPACE_LITERALS,
   type BundleCategoryRule,
   type BundleExclusion,
+  type BundleNamespaceLiteral,
 } from './bundleBaseline';
 import {
   assertBundleBaselineHealth,
   bundleExclusionKey,
+  bundleNamespaceKey,
   evaluateBundleBaseline,
   formatBundleReport,
   identifierAround,
+  namespaceLiteralMatches,
   ruleMatches,
+  runAround,
   scanBundleResidual,
   tokenAround,
   validateBundleBaseline,
@@ -74,11 +82,27 @@ function rule(over: Partial<BundleCategoryRule> = {}): BundleCategoryRule {
   };
 }
 
+function literal(
+  over: Partial<BundleNamespaceLiteral> = {}
+): BundleNamespaceLiteral {
+  return {
+    id: 'test-literal',
+    literal: 'teleport',
+    anchor: 'cssVarsPrefix:',
+    category: 'dependency-css-namespace',
+    count: 1,
+    site: 'a site',
+    reason: 'a reason',
+    ...over,
+  };
+}
+
 describe('bundle exclusion list, validity', () => {
   it('the shipped list validates', () => {
     expect(validateBundleBaseline()).toEqual([]);
     expect(BUNDLE_EXCLUSIONS.length).toBeGreaterThan(0);
     expect(BUNDLE_CATEGORY_RULES.length).toBeGreaterThan(0);
+    expect(BUNDLE_NAMESPACE_LITERALS.length).toBeGreaterThan(0);
   });
 
   it('every shipped record and rule states a reason', () => {
@@ -125,6 +149,181 @@ describe('bundle exclusion list, validity', () => {
     expect(text).toContain('has no reason');
     expect(text).toContain('count below 1');
     expect(text).toContain('is a duplicate');
+  });
+});
+
+/**
+ * The namespace literal is the ONE key in this file that is as short as the
+ * brand word, so it is the one place a phrase could get in. These tests are
+ * the proof that it cannot.
+ */
+describe('the namespace literal, and why it cannot admit copy', () => {
+  it('every shipped literal names one site, one reason and a cap', () => {
+    for (const shipped of BUNDLE_NAMESPACE_LITERALS) {
+      expect(shipped.literal).toBe('teleport');
+      expect(shipped.site.trim().length).toBeGreaterThan(0);
+      expect(shipped.reason.trim().length).toBeGreaterThan(0);
+      expect(shipped.count).toBeGreaterThan(0);
+    }
+  });
+
+  it('THE PROOF: no expressible literal can admit a phrase', () => {
+    // Try, with the widest anchor the validator allows, to write a record that
+    // takes `Welcome to Teleport`. There are only two levers, the literal and
+    // the anchor, and both are tried here.
+    const asPhrase = literal({ literal: 'Welcome to Teleport', anchor: '(' });
+    expect(validateBundleBaseline([], [], [asPhrase]).join('\n')).toContain(
+      'not the bare lower-case brand word'
+    );
+    const asCapital = literal({ literal: 'Teleport' });
+    expect(validateBundleBaseline([], [], [asCapital]).join('\n')).toContain(
+      'not the bare lower-case brand word'
+    );
+    const asSuffix = literal({ literal: 'teleport roles' });
+    expect(validateBundleBaseline([], [], [asSuffix]).join('\n')).toContain(
+      'not the bare lower-case brand word'
+    );
+
+    // The anchor is the only remaining lever, and it cannot name the tail of a
+    // sentence, because it must end in a structural character.
+    const asSentenceTail = literal({ anchor: 'Welcome to ' });
+    expect(
+      validateBundleBaseline([], [], [asSentenceTail]).join('\n')
+    ).toContain('An anchor must end in one of');
+    expect(validateBundleBaseline([], [], [literal({ anchor: '' })])).toEqual([
+      expect.stringContaining('has no anchor'),
+    ]);
+
+    // And with a valid record, the phrase still does not match, because the
+    // word has to be the WHOLE string between two identical quotes.
+    const valid = literal({ anchor: '(' });
+    for (const phrase of [
+      'f("Welcome to Teleport")',
+      'f("Welcome to teleport")',
+      'f(`Please ask your Teleport administrator to update your role`)',
+      'f(`teleport roles`)',
+      'f(`the teleport binary`)',
+    ]) {
+      const at = phrase.toLowerCase().indexOf('teleport');
+      expect(namespaceLiteralMatches(valid, phrase, at)).toBe(false);
+    }
+
+    // Nor does a bare word that is not quoted at all, nor one whose two sides
+    // carry different quotes, nor a capitalised whole string.
+    const unquoted = 'f(teleport)';
+    expect(
+      namespaceLiteralMatches(valid, unquoted, unquoted.indexOf('teleport'))
+    ).toBe(false);
+    const mixed = 'f(`teleport")';
+    expect(
+      namespaceLiteralMatches(valid, mixed, mixed.indexOf('teleport'))
+    ).toBe(false);
+    const capital = 'f(`Teleport`)';
+    expect(
+      namespaceLiteralMatches(valid, capital, capital.indexOf('Teleport'))
+    ).toBe(false);
+
+    // What it DOES take: a complete lower-case literal at the anchor.
+    const wanted = 'f(`teleport`)';
+    expect(
+      namespaceLiteralMatches(valid, wanted, wanted.indexOf('teleport'))
+    ).toBe(true);
+  });
+
+  it('rejects a nameless site, a zero count and a duplicate', () => {
+    const problems = validateBundleBaseline(
+      [],
+      [],
+      [literal({ site: '  ' }), literal({ count: 0 }), literal({ reason: '' })]
+    );
+    const text = problems.join('\n');
+    expect(text).toContain('names no site');
+    expect(text).toContain('count below 1');
+    expect(text).toContain('has no reason');
+    expect(text).toContain('is a duplicate');
+  });
+
+  it('the anchor pins a record to one position, not to a shape', () => {
+    // The same complete literal at a different position is not admitted. This
+    // is what stops the three design system records absorbing the five
+    // first-party bare words that ref-o74l.3.7 owns.
+    const prefixed = literal({ anchor: 'cssVarsPrefix:' });
+    const here = 'x={cssVarsPrefix:`teleport`}';
+    expect(
+      namespaceLiteralMatches(prefixed, here, here.indexOf('teleport'))
+    ).toBe(true);
+    const elsewhere = 'x={placeholder:`teleport`}';
+    expect(
+      namespaceLiteralMatches(
+        prefixed,
+        elsewhere,
+        elsewhere.indexOf('teleport')
+      )
+    ).toBe(false);
+  });
+
+  it('the shipped literals take the three design system sites and no more', () => {
+    // The three positions, as the minifier emits them, plus the five other
+    // whole-string bare words the same build holds. Only the three are taken.
+    const designSystem =
+      'a=Yd({preflight:!0,cssVarsPrefix:`teleport`,cssVarsRoot:`:root`});' +
+      'b={mode:1,name:`teleport`,config:c};' +
+      'return t(e,[`teleport`,`colors`]);';
+    const firstParty =
+      'SNe=`teleport`;' +
+      'x({placeholder:`teleport`});' +
+      'y({children:`teleport`});' +
+      'z=r.info?.repository||`teleport`;' +
+      'w=r.info?.repository??`teleport`;';
+    const result = scanBundleResidual(
+      'app/app.js',
+      designSystem + firstParty,
+      [],
+      []
+    );
+    expect(result.totalOccurrences).toBe(8);
+    expect(result.accountedByNamespace).toBe(3);
+    expect(result.accountedByExclusion).toBe(0);
+    expect(result.residualOccurrences).toBe(5);
+    for (const shipped of BUNDLE_NAMESPACE_LITERALS) {
+      expect(result.exclusionHits[bundleNamespaceKey(shipped)]).toBe(1);
+    }
+  });
+
+  it('THE CAP: a fourth match at an anchored position fails the build', () => {
+    // The count on a record is a note. The count on a namespace literal is a
+    // cap, because this is the only key that can reach a one-word string.
+    const capped = literal({ count: 1 });
+    const twice = 'a={cssVarsPrefix:`teleport`};b={cssVarsPrefix:`teleport`};';
+    const result = scanBundleResidual('app/app.js', twice, [], [], [], [], [
+      capped,
+    ]);
+    expect(result.accountedByNamespace).toBe(2);
+    const verdict = evaluateBundleBaseline([result], [], [], [capped]);
+    expect(verdict.overflow).toHaveLength(1);
+    expect(verdict.overflow[0]).toContain('BUNDLE_CAP_FAIL');
+    expect(verdict.overflow[0]).toContain('records 1');
+    expect(verdict.overflow[0]).toContain('matched 2');
+    expect(() =>
+      assertBundleBaselineHealth([result], [], [], [capped])
+    ).toThrow(/BUNDLE_CAP_FAIL/);
+  });
+
+  it('the ratchet removes a namespace literal that stops matching', () => {
+    const gone = literal({ anchor: 'goneAway:' });
+    const result = scanBundleResidual(
+      'app/app.js',
+      'a={cssVarsPrefix:`teleport`};',
+      [],
+      [],
+      [],
+      [],
+      [gone]
+    );
+    const verdict = evaluateBundleBaseline([result], [], [], [gone]);
+    expect(verdict.obsolete).toHaveLength(1);
+    expect(verdict.obsolete[0]).toContain('BUNDLE_RATCHET_FAIL');
+    expect(verdict.obsolete[0]).toContain('The list can only shrink');
   });
 });
 
@@ -217,14 +416,19 @@ describe('bundle exclusion list, what it admits', () => {
   });
 
   it('IS NOT VACUOUS: the shipped list never admits a lone brand word', () => {
-    // The whole list, exactly as shipped, against copy. If any record or rule
-    // ever grew broad enough to swallow a bare occurrence, this fails.
+    // The whole list, exactly as shipped, against copy. If any record, rule or
+    // namespace literal ever grew broad enough to swallow a bare occurrence,
+    // this fails. The last three cases are the ones the namespace literal
+    // could plausibly reach: a lone word assigned to a variable, a lone word
+    // in lower case inside prose, and a capitalised whole string.
     const copy =
       'const a="Welcome to Teleport";const b=`Log in to Teleport`;' +
-      'const c="this Teleport Cluster.";const d="teleport";';
+      'const c="this Teleport Cluster.";const d="teleport";' +
+      'const e="Welcome to teleport";const f=`Teleport`;';
     const result = scanBundleResidual('app/app.js', copy, [], []);
     expect(result.accountedByExclusion).toBe(0);
-    expect(result.residualOccurrences).toBe(4);
+    expect(result.accountedByNamespace).toBe(0);
+    expect(result.residualOccurrences).toBe(6);
   });
 
   it('still reports an occurrence that no record names', () => {
@@ -248,7 +452,7 @@ describe('bundle exclusion list, the ratchet', () => {
       [stale],
       []
     );
-    const verdict = evaluateBundleBaseline([result], [stale], []);
+    const verdict = evaluateBundleBaseline([result], [stale], [], []);
     expect(verdict.obsolete).toHaveLength(1);
     expect(verdict.obsolete[0]).toContain('BUNDLE_RATCHET_FAIL');
     expect(verdict.obsolete[0]).toContain(bundleExclusionKey(stale));
@@ -264,7 +468,7 @@ describe('bundle exclusion list, the ratchet', () => {
       [],
       [rule()]
     );
-    const verdict = evaluateBundleBaseline([result], [], [rule()]);
+    const verdict = evaluateBundleBaseline([result], [], [rule()], []);
     expect(verdict.obsolete).toHaveLength(1);
     expect(verdict.obsolete[0]).toContain('rule "rule:test-rule"');
   });
@@ -278,7 +482,7 @@ describe('bundle exclusion list, the ratchet', () => {
       [stale],
       []
     );
-    expect(() => assertBundleBaselineHealth([result], [stale], [])).toThrow(
+    expect(() => assertBundleBaselineHealth([result], [stale], [], [])).toThrow(
       /BUNDLE_RATCHET_FAIL/
     );
   });
@@ -293,7 +497,7 @@ describe('bundle exclusion list, the ratchet', () => {
       [keep],
       []
     );
-    const verdict = assertBundleBaselineHealth([result], [keep], []);
+    const verdict = assertBundleBaselineHealth([result], [keep], [], []);
     expect(verdict.obsolete).toEqual([]);
     expect(verdict.drift.join('\n')).toContain('recorded 5, found 1');
     expect(formatBundleReport([result], false, 25, verdict)).toContain(
@@ -311,11 +515,113 @@ describe('bundle exclusion list, the ratchet', () => {
       [keep],
       []
     );
-    const verdict = assertBundleBaselineHealth([result], [keep], []);
+    const verdict = assertBundleBaselineHealth([result], [keep], [], []);
     expect(verdict.invalid).toEqual([]);
     expect(verdict.obsolete).toEqual([]);
+    expect(verdict.overflow).toEqual([]);
     expect(verdict.drift).toEqual([]);
     expect(verdict.admitted).toBe(1);
+  });
+});
+
+/**
+ * WHAT WATCHES THE COPY THAT LIVES OUTSIDE THE CATALOG.
+ *
+ * A `?raw` import puts an asset's text straight into the bundle. The layer 1
+ * scan set does not cover a `.yaml`, and neither does `shouldTransform`, so
+ * the catalog cannot reach a phrase inside one. `ref-o74l.3.6` measured the
+ * family on 2026-08-19: 17 `?raw` imports across 4 modules, every one of them
+ * a `.yaml`, 2 assets holding the brand word, and 1 of those 2 holding it only
+ * inside `goteleport.com`. One file and one line, so the fork edited the line
+ * at `AuthConnectors/templates/github.yaml:16` instead of growing the
+ * transform for a family of one.
+ *
+ * THIS IS WHAT REPLACES THE CATALOG FOR THAT LINE. It discovers the imports by
+ * reading the source, so a NEW `?raw` import is covered the day it lands, and
+ * it applies the same host exclusion the bundle gate applies, so a docs URL
+ * stays legal. Layer 2 watches the same text in the emitted bundle once strict
+ * mode is on, but it can only say a run is unaccounted. This test names the
+ * file and the line.
+ */
+describe('every ?raw asset that ships is free of the brand word', () => {
+  const packagesRoot = resolve(__dirname, '..', '..', '..');
+  const skip = new Set(['node_modules', 'dist', 'build']);
+
+  /** Every `<importer, resolved asset path>` pair the source declares. */
+  function rawImports(): { importer: string; asset: string }[] {
+    const found: { importer: string; asset: string }[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (skip.has(entry.name) || entry.name.startsWith('.')) {
+          continue;
+        }
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if (!/\.(ts|tsx|js|jsx|mts|mjs)$/.test(entry.name)) {
+          continue;
+        }
+        const source = readFileSync(path, 'utf8');
+        const pattern = /from\s+['"]([^'"]+\?raw)['"]/g;
+        let match = pattern.exec(source);
+        while (match) {
+          found.push({
+            importer: path,
+            asset: resolve(dirname(path), match[1].split('?')[0]),
+          });
+          match = pattern.exec(source);
+        }
+      }
+    };
+    walk(packagesRoot);
+    return found;
+  }
+
+  it('finds the ?raw family, so this test cannot pass by finding nothing', () => {
+    const imports = rawImports();
+    expect(imports.length).toBeGreaterThanOrEqual(17);
+    expect(imports.every(i => i.asset.endsWith('.yaml'))).toBe(true);
+    expect(
+      imports.some(i => i.asset.endsWith('AuthConnectors/templates/github.yaml'))
+    ).toBe(true);
+  });
+
+  it('NO ?raw ASSET HOLDS THE BRAND WORD outside an excluded host', () => {
+    const offences: string[] = [];
+    for (const { asset } of rawImports()) {
+      const text = readFileSync(asset, 'utf8');
+      const lower = text.toLowerCase();
+      let at = lower.indexOf('teleport');
+      while (at >= 0) {
+        const { run } = runAround(text, at);
+        if (!isExcludedByHost(run, EXCLUDED_HOSTS)) {
+          const line = text.slice(0, at).split('\n').length;
+          offences.push(
+            `${relative(packagesRoot, asset)}:${line}: ${JSON.stringify(run)}`
+          );
+        }
+        at = lower.indexOf('teleport', at + 1);
+      }
+    }
+    // A ?raw asset ships its text verbatim. No catalog entry can reach it, so
+    // the only fix is to edit the asset.
+    expect(offences).toEqual([]);
+  });
+
+  it('the GitHub connector template still says what it has to say', () => {
+    // Option 2 of ADR 0007 amendment 6 traded one line of upstream divergence
+    // for the machinery a family of one did not justify. This is the line, and
+    // this test is what keeps it correct rather than merely brand-free.
+    const template = readFileSync(
+      resolve(__dirname, '..', 'AuthConnectors', 'templates', 'github.yaml'),
+      'utf8'
+    );
+    expect(template).toContain(
+      '# mapping of GitHub team memberships to Psiphon Access roles'
+    );
+    expect(template).toContain('teams_to_roles:');
   });
 });
 

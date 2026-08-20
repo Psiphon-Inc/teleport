@@ -27,16 +27,22 @@
  * reports and does not throw. When the aggregate source baseline reaches zero,
  * `isBundleGateStrict` becomes true on its own, with no further commit.
  *
- * THREE THINGS ACCOUNT FOR AN OCCURRENCE, and nothing else does.
+ * FOUR THINGS ACCOUNT FOR AN OCCURRENCE, and nothing else does.
  *
  *   1. A catalog entry, matched by its replacement text.
  *   2. An excluded host from `EXCLUDED_HOSTS`.
  *   3. A record or a named rule in `bundleBaseline.ts`, for the occurrences a
  *      source-keyed catalog entry can never reach.
+ *   4. A namespace literal in `bundleBaseline.ts`, for the three occurrences
+ *      where the WHOLE string is the bare lower-case word. A record cannot be
+ *      that short, by a guard this file must not weaken, so those three get a
+ *      separate type with a narrower key and a HARD CAP on how many
+ *      occurrences it may take.
  *
- * The third list has ITS OWN RATCHET, in `evaluateBundleBaseline`, and that
- * ratchet does not wait for strict mode. A record that stops matching fails
- * the build until somebody removes it, so the list can only shrink.
+ * The third and fourth lists have THEIR OWN RATCHET, in
+ * `evaluateBundleBaseline`, and that ratchet does not wait for strict mode. A
+ * record that stops matching fails the build until somebody removes it, so
+ * both lists can only shrink.
  */
 
 import {
@@ -54,8 +60,10 @@ import {
   BUNDLE_BASELINE_DATE,
   BUNDLE_CATEGORY_RULES,
   BUNDLE_EXCLUSIONS,
+  BUNDLE_NAMESPACE_LITERALS,
   type BundleCategoryRule,
   type BundleExclusion,
+  type BundleNamespaceLiteral,
   type BundleTail,
 } from './bundleBaseline';
 
@@ -80,6 +88,8 @@ export interface BundleScanResult {
   readonly accountedByHost: number;
   /** Occurrences a record or a rule in `bundleBaseline.ts` admitted. */
   readonly accountedByExclusion: number;
+  /** Occurrences a whole-string namespace literal admitted. */
+  readonly accountedByNamespace: number;
   /** Hits per exclusion key in this chunk. The ratchet reads this. */
   readonly exclusionHits: Readonly<Record<string, number>>;
   readonly residuals: readonly BundleResidual[];
@@ -106,6 +116,62 @@ export function bundleRuleKey(rule: BundleCategoryRule): string {
   return `rule:${rule.id}`;
 }
 
+/** Stable key for one whole-string namespace literal. */
+export function bundleNamespaceKey(literal: BundleNamespaceLiteral): string {
+  return `namespace:${literal.id}`;
+}
+
+/**
+ * The quote characters a complete string literal can be wrapped in. The
+ * minifier rewrites most literals as template strings, so the backtick is not
+ * optional.
+ */
+const QUOTE_CHARACTERS: readonly string[] = ['"', "'", '`'];
+
+/**
+ * The characters an `anchor` may end with. Each one puts the literal in a code
+ * position: a property value, an array element, an argument or an assignment.
+ * An anchor that ended in a letter would name the tail of a sentence, and this
+ * mechanism must never be able to do that.
+ */
+const ANCHOR_TERMINATORS: readonly string[] = [':', '[', ',', '(', '='];
+
+/**
+ * True when the occurrence at `index` is a COMPLETE string literal equal to
+ * the bare lower-case brand word, sitting immediately after `literal.anchor`.
+ *
+ * Read the three conditions together. The word must match in lower case, so a
+ * capitalised `Teleport` never reaches here. The characters on both sides must
+ * be the same quote, so the match is a whole literal and not a word inside
+ * one. And the anchor must precede the opening quote, so the record names one
+ * position rather than a shape.
+ */
+export function namespaceLiteralMatches(
+  literal: BundleNamespaceLiteral,
+  code: string,
+  index: number
+): boolean {
+  const end = index + literal.literal.length;
+  if (code.slice(index, end) !== literal.literal) {
+    return false;
+  }
+  const before = code[index - 1];
+  const after = code[end];
+  if (
+    before === undefined ||
+    after === undefined ||
+    before !== after ||
+    !QUOTE_CHARACTERS.includes(before)
+  ) {
+    return false;
+  }
+  const anchorStart = index - 1 - literal.anchor.length;
+  if (anchorStart < 0) {
+    return false;
+  }
+  return code.startsWith(literal.anchor, anchorStart);
+}
+
 /**
  * The named tail alphabets. The data in `bundleBaseline.ts` names one of
  * these, so a rule cannot express an arbitrary pattern. This mirrors the way
@@ -123,7 +189,12 @@ const TAIL_MATCHERS: Readonly<Record<BundleTail, (tail: string) => boolean>> = {
     ),
 };
 
-function runAround(
+/**
+ * The surrounding run of non-whitespace, non-quote characters. It is what the
+ * host exclusion is tested against, and it is exported so a test can apply the
+ * same host rule to an asset that never reaches a chunk as code.
+ */
+export function runAround(
   text: string,
   index: number
 ): { run: string; start: number } {
@@ -200,7 +271,8 @@ export function ruleMatches(
  */
 export function validateBundleBaseline(
   exclusions: readonly BundleExclusion[] = BUNDLE_EXCLUSIONS,
-  rules: readonly BundleCategoryRule[] = BUNDLE_CATEGORY_RULES
+  rules: readonly BundleCategoryRule[] = BUNDLE_CATEGORY_RULES,
+  literals: readonly BundleNamespaceLiteral[] = BUNDLE_NAMESPACE_LITERALS
 ): string[] {
   const problems: string[] = [];
   const seen = new Set<string>();
@@ -259,6 +331,53 @@ export function validateBundleBaseline(
     seen.add(key);
   }
 
+  // The namespace literals get the OPPOSITE length rule to the one above, and
+  // that is deliberate. A record must be longer than the brand word so it can
+  // never match a lone occurrence. A namespace literal must BE the brand word
+  // and nothing else, so the set of literals it can name has exactly one
+  // member. Neither rule is a relaxation of the other: together they leave no
+  // way to express a key that matches a phrase.
+  for (const literal of literals) {
+    const key = bundleNamespaceKey(literal);
+    if (literal.literal !== BRAND_WORD) {
+      problems.push(
+        `INVALID_EXCLUSION: namespace literal "${key}" names ${JSON.stringify(literal.literal)}, not the bare lower-case brand word. This mechanism exists for one string and can express no other.`
+      );
+    }
+    if (literal.anchor.length === 0) {
+      problems.push(
+        `INVALID_EXCLUSION: namespace literal "${key}" has no anchor, so it would match the bare word at any position.`
+      );
+    } else if (
+      !ANCHOR_TERMINATORS.includes(literal.anchor[literal.anchor.length - 1])
+    ) {
+      problems.push(
+        `INVALID_EXCLUSION: namespace literal "${key}" has an anchor ending in ${JSON.stringify(literal.anchor[literal.anchor.length - 1])}. An anchor must end in one of ${ANCHOR_TERMINATORS.join(' ')} so it names a code position and not the tail of a sentence.`
+      );
+    }
+    if (literal.reason.trim().length === 0) {
+      problems.push(
+        `INVALID_EXCLUSION: namespace literal "${key}" has no reason.`
+      );
+    }
+    if (literal.site.trim().length === 0) {
+      problems.push(
+        `INVALID_EXCLUSION: namespace literal "${key}" names no site. Every admitted occurrence must be named by a human.`
+      );
+    }
+    if (literal.count < 1) {
+      problems.push(
+        `INVALID_EXCLUSION: namespace literal "${key}" records a count below 1, so it was never measured.`
+      );
+    }
+    if (seen.has(key)) {
+      problems.push(
+        `INVALID_EXCLUSION: namespace literal "${key}" is a duplicate.`
+      );
+    }
+    seen.add(key);
+  }
+
   return problems;
 }
 
@@ -278,7 +397,8 @@ export function scanBundleResidual(
   catalog: readonly BrandPhrase[] = BRAND_CATALOG,
   hosts: readonly ExcludedHost[] = EXCLUDED_HOSTS,
   exclusions: readonly BundleExclusion[] = BUNDLE_EXCLUSIONS,
-  rules: readonly BundleCategoryRule[] = BUNDLE_CATEGORY_RULES
+  rules: readonly BundleCategoryRule[] = BUNDLE_CATEGORY_RULES,
+  literals: readonly BundleNamespaceLiteral[] = BUNDLE_NAMESPACE_LITERALS
 ): BundleScanResult {
   const consumed = new Uint8Array(code.length);
   const surviving = sortLongestFirst(
@@ -324,6 +444,9 @@ export function scanBundleResidual(
   for (const rule of rules) {
     exclusionHits[bundleRuleKey(rule)] = 0;
   }
+  for (const literal of literals) {
+    exclusionHits[bundleNamespaceKey(literal)] = 0;
+  }
 
   const lower = code.toLowerCase();
   const grouped = new Map<
@@ -333,14 +456,22 @@ export function scanBundleResidual(
   let total = 0;
   let accountedByHost = 0;
   let accountedByExclusion = 0;
+  let accountedByNamespace = 0;
   let residualOccurrences = 0;
   let at = lower.indexOf(BRAND_WORD);
   while (at >= 0) {
     total++;
     if (!consumed[at]) {
       const { run, start } = runAround(code, at);
+      const namespace = literals.find(candidate =>
+        namespaceLiteralMatches(candidate, code, at)
+      );
       if (isExcludedByHost(run, hosts)) {
         accountedByHost++;
+      } else if (namespace) {
+        const key = bundleNamespaceKey(namespace);
+        exclusionHits[key] = (exclusionHits[key] ?? 0) + 1;
+        accountedByNamespace++;
       } else {
         const token = tokenAround(code, at);
         const identifier = identifierAround(code, at);
@@ -393,6 +524,7 @@ export function scanBundleResidual(
     accountedByCatalog,
     accountedByHost,
     accountedByExclusion,
+    accountedByNamespace,
     exclusionHits,
     residuals,
     residualOccurrences,
@@ -405,6 +537,12 @@ export interface BundleBaselineVerdict {
   readonly invalid: readonly string[];
   /** Records and rules that matched nothing. Each fails a build. */
   readonly obsolete: readonly string[];
+  /**
+   * Namespace literals that matched more often than they record. Each fails a
+   * build, because that list is the only one whose key can reach a one-word
+   * string, so its count is a cap rather than a note.
+   */
+  readonly overflow: readonly string[];
   /** Records whose measured count moved. Reported, never fatal. */
   readonly drift: readonly string[];
   /** Total occurrences the list admitted. */
@@ -424,9 +562,10 @@ export interface BundleBaselineVerdict {
 export function evaluateBundleBaseline(
   results: readonly BundleScanResult[],
   exclusions: readonly BundleExclusion[] = BUNDLE_EXCLUSIONS,
-  rules: readonly BundleCategoryRule[] = BUNDLE_CATEGORY_RULES
+  rules: readonly BundleCategoryRule[] = BUNDLE_CATEGORY_RULES,
+  literals: readonly BundleNamespaceLiteral[] = BUNDLE_NAMESPACE_LITERALS
 ): BundleBaselineVerdict {
-  const invalid = validateBundleBaseline(exclusions, rules);
+  const invalid = validateBundleBaseline(exclusions, rules, literals);
 
   const totals = new Map<string, number>();
   for (const exclusion of exclusions) {
@@ -435,6 +574,9 @@ export function evaluateBundleBaseline(
   for (const rule of rules) {
     totals.set(bundleRuleKey(rule), 0);
   }
+  for (const literal of literals) {
+    totals.set(bundleNamespaceKey(literal), 0);
+  }
   for (const result of results) {
     for (const [key, hits] of Object.entries(result.exclusionHits)) {
       totals.set(key, (totals.get(key) ?? 0) + hits);
@@ -442,6 +584,7 @@ export function evaluateBundleBaseline(
   }
 
   const obsolete: string[] = [];
+  const overflow: string[] = [];
   const drift: string[] = [];
   let admitted = 0;
   for (const exclusion of exclusions) {
@@ -476,8 +619,34 @@ export function evaluateBundleBaseline(
       );
     }
   }
+  for (const literal of literals) {
+    const key = bundleNamespaceKey(literal);
+    const found = totals.get(key) ?? 0;
+    admitted += found;
+    if (found === 0) {
+      obsolete.push(
+        `BUNDLE_RATCHET_FAIL: namespace literal "${key}" matched nothing in the emitted bundle. ` +
+          `It was recorded on ${BUNDLE_BASELINE_DATE} with ${literal.count} occurrences at ${literal.site}. ` +
+          'Delete it from BUNDLE_NAMESPACE_LITERALS. The list can only shrink.'
+      );
+    } else if (found > literal.count) {
+      // A CAP, NOT A DRIFT NOTE. This is the only key short enough to reach a
+      // one-word string, so an extra match is exactly the case where copy
+      // could be absorbed without anybody seeing it. Fail, and make a human
+      // look at the new occurrence.
+      overflow.push(
+        `BUNDLE_CAP_FAIL: namespace literal "${key}" records ${literal.count} occurrences at ${literal.site} but matched ${found}. ` +
+          'This list names one whole string equal to the bare brand word, so its count is a cap. ' +
+          'Check whether the new occurrence is copy before you raise it.'
+      );
+    } else if (found < literal.count) {
+      drift.push(
+        `  drift  ${key}: recorded ${literal.count}, found ${found}. Lower the count when you next touch this record.`
+      );
+    }
+  }
 
-  return { invalid, obsolete, drift, admitted };
+  return { invalid, obsolete, overflow, drift, admitted };
 }
 
 /**
@@ -488,10 +657,11 @@ export function evaluateBundleBaseline(
 export function assertBundleBaselineHealth(
   results: readonly BundleScanResult[],
   exclusions: readonly BundleExclusion[] = BUNDLE_EXCLUSIONS,
-  rules: readonly BundleCategoryRule[] = BUNDLE_CATEGORY_RULES
+  rules: readonly BundleCategoryRule[] = BUNDLE_CATEGORY_RULES,
+  literals: readonly BundleNamespaceLiteral[] = BUNDLE_NAMESPACE_LITERALS
 ): BundleBaselineVerdict {
-  const verdict = evaluateBundleBaseline(results, exclusions, rules);
-  const fatal = [...verdict.invalid, ...verdict.obsolete];
+  const verdict = evaluateBundleBaseline(results, exclusions, rules, literals);
+  const fatal = [...verdict.invalid, ...verdict.obsolete, ...verdict.overflow];
   if (fatal.length > 0) {
     throw new Error(
       `psiphon-brand: the bundle exclusion list in bundleBaseline.ts is not healthy.\n${fatal.join('\n')}`
@@ -513,7 +683,7 @@ export function formatBundleReport(
   );
   for (const result of results) {
     lines.push(
-      `${result.chunk}: ${result.totalOccurrences} occurrences, ${result.accountedByCatalog} accounted by catalog, ${result.accountedByHost} accounted by an excluded host, ${result.accountedByExclusion} accounted by the bundle exclusion list, ${result.residualOccurrences} unaccounted in ${result.residuals.length} distinct runs`
+      `${result.chunk}: ${result.totalOccurrences} occurrences, ${result.accountedByCatalog} accounted by catalog, ${result.accountedByHost} accounted by an excluded host, ${result.accountedByExclusion} accounted by the bundle exclusion list, ${result.accountedByNamespace} accounted by a namespace literal, ${result.residualOccurrences} unaccounted in ${result.residuals.length} distinct runs`
     );
     for (const residual of result.residuals.slice(0, sampleSize)) {
       lines.push(
@@ -526,7 +696,7 @@ export function formatBundleReport(
   }
   if (verdict) {
     lines.push(
-      `bundle exclusion list (${BUNDLE_BASELINE_COMMIT}, ${BUNDLE_BASELINE_DATE}): ${BUNDLE_EXCLUSIONS.length} records and ${BUNDLE_CATEGORY_RULES.length} rules admitted ${verdict.admitted} occurrences`
+      `bundle exclusion list (${BUNDLE_BASELINE_COMMIT}, ${BUNDLE_BASELINE_DATE}): ${BUNDLE_EXCLUSIONS.length} records, ${BUNDLE_CATEGORY_RULES.length} rules and ${BUNDLE_NAMESPACE_LITERALS.length} namespace literals admitted ${verdict.admitted} occurrences`
     );
     lines.push(...verdict.drift);
   }

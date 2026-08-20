@@ -56,20 +56,26 @@
  * Keying a hard failure on an occurrence count would fire on any dependency
  * bump that adds one CSS selector, and a gate that cries wolf gets deleted.
  *
- * TWO MEASURED GAPS ARE DELIBERATELY NOT IN THIS FILE. Both were found by
- * building the tree with every source baseline emptied and every catalog leaf
- * filled, which is the state that turns strict mode on.
+ * A THIRD MECHANISM SITS BELOW, and it is deliberately separate. Three
+ * occurrences in the bundle are a WHOLE string equal to the bare lower-case
+ * brand word, so no record can name them: the structural guard above forbids a
+ * record as short as the brand word, and that guard is what keeps copy out.
+ * All three are the `@gravitational/design-system` CSS variable namespace, and
+ * the operator decided on 2026-08-19 to keep that namespace as `teleport`,
+ * because it is a dependency boundary. `BUNDLE_NAMESPACE_LITERALS` is their
+ * home. Read the comment on that constant before you add to it.
  *
- *   1. Three occurrences where the WHOLE string is the bare brand word, all of
- *      them the design system CSS variable namespace: ``cssVarsPrefix:`teleport` ``,
- *      the preset ``name:`teleport` `` and the token path ``[`teleport`,`colors`]``.
- *      No record can name them, because the structural guard forbids a record
- *      as short as the brand word and that guard is what keeps copy out. They
- *      need a decision, not an exclusion.
- *   2. One occurrence of user-visible copy at
- *      `AuthConnectors/templates/github.yaml:16`, which the editor shows to a
- *      user. It reaches the bundle through `?raw`, so neither the layer 1 scan
- *      set nor `shouldTransform` sees it. It is copy, so it must not come here.
+ * ONE MEASURED GAP IS DELIBERATELY NOT IN THIS FILE, and never will be. It was
+ * user-visible copy at `AuthConnectors/templates/github.yaml:16`, which the
+ * GitHub connector editor shows to a user. It reached the bundle through
+ * `?raw`, so neither the layer 1 scan set nor `shouldTransform` saw it. It is
+ * copy, so it could not come here. `ref-o74l.3.6` measured the family it
+ * belongs to: 17 `?raw` imports in the tree, all of them `.yaml?raw`, of which
+ * 2 files hold the brand word and 1 of those 2 holds it only inside
+ * `goteleport.com`, which `EXCLUDED_HOSTS` already accounts. One file and one
+ * line, so the fork edits that line rather than growing the transform for it.
+ * `bundleGate.test.ts` reads every `?raw` asset in the tree and fails when any
+ * of them holds the brand word outside an excluded host.
  */
 
 /**
@@ -93,6 +99,8 @@ export type BundleCategory =
   | 'dependency-css-class'
   /** A CSS custom property emitted from the design system `cssVarsPrefix`. */
   | 'dependency-css-var'
+  /** The design system CSS variable namespace itself, as a whole string. */
+  | 'dependency-css-namespace'
   /** A message type name in generated protobuf code under `gen/proto/ts`. */
   | 'generated-protobuf'
   /** An identifier or property name, which the scanner never visits. */
@@ -151,6 +159,66 @@ export interface BundleCategoryRule {
   readonly reason: string;
 }
 
+/**
+ * One whole string literal in the bundle whose entire content is the bare
+ * lower-case brand word.
+ *
+ * WHY THIS TYPE EXISTS AT ALL. `BundleExclusion` cannot express one of these,
+ * and it must not learn how. Its guard rejects any token that is not strictly
+ * longer than the brand word, and that guard is the only thing standing
+ * between the exclusion list and a record that swallows every `Teleport` in
+ * the product. So the three occurrences get a separate type with a separate
+ * guard, rather than a loosened shared one.
+ *
+ * WHY IT CANNOT ADMIT COPY. Three conditions must hold at once, and the first
+ * two are not configurable.
+ *
+ *   1. The matched text is exactly `teleport`, in lower case. `literal` is
+ *      validated against `BRAND_WORD` for equality, so the set of literals a
+ *      record can name has exactly one member. `Teleport` is unexpressible,
+ *      and so is every phrase.
+ *   2. The character before the match and the character after it are the SAME
+ *      quote character. The match is therefore a complete string literal, not
+ *      a word inside one. `"Welcome to Teleport"` fails on condition 1 and on
+ *      condition 2. `"Welcome to teleport"` passes condition 1 on the word but
+ *      fails condition 2, because the character before it is a space.
+ *   3. The exact text in `anchor` immediately precedes the opening quote, and
+ *      `anchor` ends in a structural character. This pins each record to one
+ *      code position instead of to a shape, so the mechanism cannot quietly
+ *      absorb an occurrence it was not written for.
+ *
+ * WHAT IT COULD ADMIT THAT IT SHOULD NOT, stated plainly: a user-visible
+ * string whose WHOLE text is the single lower-case word `teleport`, sitting at
+ * one of the three anchored positions. A one-word label, placeholder or
+ * tooltip is the realistic case. Two things bound that risk. Each record names
+ * its site in `site`, so a reader can check it. And `count` is a HARD CAP:
+ * `evaluateBundleBaseline` fails the build when a record matches more times
+ * than it records, unlike the count on a `BundleExclusion`, which only drifts.
+ * A fourth occurrence at an anchored position therefore stops the build
+ * instead of being absorbed.
+ */
+export interface BundleNamespaceLiteral {
+  /** Unique id, used in the report and in a ratchet message. */
+  readonly id: string;
+  /** Must equal `BRAND_WORD` exactly. No other value validates. */
+  readonly literal: string;
+  /**
+   * The exact text that must immediately precede the opening quote. It is
+   * compared for equality, never as a pattern, and its last character must be
+   * one of `:`, `[`, `,`, `(` or `=`, so a record names a code position and
+   * cannot name the tail of a sentence.
+   */
+  readonly anchor: string;
+  /** Why a catalog entry cannot reach it. */
+  readonly category: BundleCategory;
+  /** A HARD CAP. More matches than this fails the build. */
+  readonly count: number;
+  /** Where in the emitting module this occurrence comes from. */
+  readonly site: string;
+  /** One sentence naming the emitter and what breaks on a rename. */
+  readonly reason: string;
+}
+
 /** The commit the list below was measured against. */
 export const BUNDLE_BASELINE_COMMIT = 'e94e5af620c';
 
@@ -184,6 +252,57 @@ export const BUNDLE_CATEGORY_RULES: readonly BundleCategoryRule[] = [
     count: 2,
     reason:
       'A CSS custom property that @gravitational/design-system emits from its cssVarsPrefix of "teleport". A rule rather than records because the surviving set is whatever tree shaking keeps: any component change alters which colour tokens reach the bundle, so a record list would go stale on a change that a reader cannot see',
+  },
+];
+
+/**
+ * Whole-string bare brand words. Measured against commit a11d6a9c07c on
+ * 2026-08-19, when the operator decided to keep the design system CSS variable
+ * namespace as `teleport`.
+ *
+ * THREE RECORDS, AND THE BAR FOR A FOURTH IS THE HIGHEST IN THIS FILE. Every
+ * one of these is the same dependency's namespace, reached from a different
+ * position in its emitted code. A fourth record needs a reason why the string
+ * is not copy, and it needs the operator, because the only reason that has
+ * ever qualified is a decision not to rename a dependency boundary.
+ *
+ * The same build holds five OTHER whole-string bare words, at
+ * `placeholder:`, `children:`, `SNe=`, `repository||` and `repository??`.
+ * None of them is here. They come from first-party modules inside the layer 1
+ * scan set, they are part of the 22 bare lower-case source sites that
+ * `ref-o74l.3.7` owns, and the anchors below are what keeps this mechanism
+ * from taking that decision on its behalf.
+ */
+export const BUNDLE_NAMESPACE_LITERALS: readonly BundleNamespaceLiteral[] = [
+  {
+    id: 'design-system-css-vars-prefix',
+    literal: 'teleport',
+    anchor: 'cssVarsPrefix:',
+    category: 'dependency-css-namespace',
+    count: 1,
+    site: 'The `cssVarsPrefix` of the base system config that @gravitational/design-system passes to createSystem',
+    reason:
+      'It is the namespace of every CSS custom property the design system emits, so it is the prefix that --teleport-colors-* is built from. The fork does not build that dependency, and the operator decided on 2026-08-19 to leave the namespace alone because renaming it is a dependency boundary change whose cost is not worth it',
+  },
+  {
+    id: 'design-system-preset-name',
+    literal: 'teleport',
+    anchor: 'name:',
+    category: 'dependency-css-namespace',
+    count: 1,
+    site: 'The `name` of the design system preset object, beside its `mode` and `config`',
+    reason:
+      'The preset name the design system registers on globalThis.__system. It selects the same namespace as the cssVarsPrefix above and is not shown to a user. Same dependency, same decision',
+  },
+  {
+    id: 'design-system-token-path-root',
+    literal: 'teleport',
+    anchor: ',[',
+    category: 'dependency-css-namespace',
+    count: 1,
+    site: 'The root of the token path array the design system walks to build a var(--...) reference for a colour token',
+    reason:
+      'The first segment of the token path, which the design system joins with hyphens to produce the CSS custom property name. It must equal the cssVarsPrefix above or every colour reference breaks. Same dependency, same decision',
   },
 ];
 
