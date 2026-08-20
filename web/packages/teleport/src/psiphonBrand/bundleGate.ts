@@ -50,6 +50,7 @@ import {
   BRAND_CATALOG,
   BRAND_WORD,
   EXCLUDED_HOSTS,
+  isWholeNodeEntry,
   type BrandBaselineEntry,
   type BrandPhrase,
   type ExcludedHost,
@@ -170,6 +171,428 @@ export function namespaceLiteralMatches(
     return false;
   }
   return code.startsWith(literal.anchor, anchorStart);
+}
+
+/**
+ * THE BOUNDED LITERAL REGION.
+ *
+ * A catalog entry is normally consumed here by searching the chunk for
+ * `entry.replacement` as a plain substring. Two kinds of entry defeat that
+ * search, and both defeat it for the same reason: the chunk does not hold the
+ * replacement text byte for byte.
+ *
+ *   1. A TEMPLATE ENTRY. When the source is a template literal WITH `${...}`
+ *      expressions and the replacement keeps the brand word, the catalog holds
+ *      author-written expression text such as `${moduleSrc}` and the minified
+ *      chunk holds `${i}`. The literal spans between the expressions, the
+ *      QUASIS, are what can be matched.
+ *   2. A WHOLE-NODE ENTRY. `sortLongestFirst` drops one, and that filter is
+ *      correct: a chunk has no AST nodes, so the only thing a substring reader
+ *      could do with an immutable bare-word entry is account every lower-case
+ *      occurrence in the product in one sweep. `ref-o74l.3.10` measured that it
+ *      would hide 401 unaccounted runs. The chunk-side analogue of a whole node
+ *      is a COMPLETE QUOTED STRING, which is the same idea
+ *      `namespaceLiteralMatches` already uses for amendment 8.
+ *
+ * ONE MECHANISM SERVES BOTH. Match the entry's quasi sequence, in order,
+ * against a complete quoted string: the character before the first quasi and
+ * the character after the last quasi must be the SAME quote, and every gap
+ * between two quasis must be an expression span. A whole-node entry has one
+ * quasi and no gap, so it degenerates to "a complete quoted string equal to the
+ * replacement", which is amendment 8's shape without the anchor.
+ *
+ * WHAT IS CONSUMED IS ONLY THE QUASI TEXT, never the expression text. The
+ * catalog provably produced the quasis. It did not produce the minified
+ * expression, so an occurrence inside one is still reported unless an
+ * identifier record accounts it.
+ *
+ * TWO SHAPES OF GAP, because two transforms lower a template two ways.
+ *
+ *   `${...}`, when the template reached the chunk as a template literal.
+ *   `` `,` ``, when the template was TAGGED and the transform lowered it to a
+ *   call over an array of its quasis, which is what every styled-components
+ *   block in `web/packages/design/src` becomes. The quasis are then adjacent
+ *   array elements, so the gap is a closing quote, a comma and an opening
+ *   quote, with the same quote character on both sides.
+ *
+ * THE SHORT-QUASI RULE, and why it is the rule the exclusion list already uses.
+ * A quasi is consumed only when its non-whitespace length is STRICTLY GREATER
+ * than the brand word, so a quasi that is the bare word and nothing else
+ * carries no context and takes nothing. The one exception is an entry that
+ * DECLARES `match: 'wholeNode'`, which amendment 7 guards at four separate
+ * places in the source readers. That declaration, and not a length, is what
+ * admits the bare word here. The pair of rules mirrors
+ * `validateBundleBaseline`: a record must be longer than the brand word, a
+ * namespace literal must BE it, and neither is a relaxation of the other.
+ *
+ * AN EMPTY QUASI IS SAFE AND IS NOT A SPECIAL CASE. It requires nothing of its
+ * own, and its neighbours become adjacent: a leading empty quasi forces the
+ * region to open with `` `${ ``, a trailing one forces it to close with
+ * `` }` ``, and one between two expressions forces `}${`. Its evidence length
+ * is zero, so it can never take an occurrence either.
+ *
+ * WHAT COUNTS AS EVIDENCE INSIDE A BOUNDED REGION, and only inside one. The
+ * styled-components transform MINIFIES the CSS it lowers. Two things it
+ * deletes therefore cannot be compared at all, and a byte comparison would
+ * fail a strict build for ever on both.
+ *
+ *   WHITESPACE. `input:enabled:hover + &,\n  .teleport-x` reaches the chunk as
+ *   `input:enabled:hover + &,.teleport-x`.
+ *   A COMMENT. `\n  // reset the appearance so we can style the background`
+ *   reaches the chunk as nothing at all.
+ *
+ * The quasi comparison therefore compares EVIDENCE: the characters that are
+ * neither whitespace nor inside a comment, in order. A `//` comment counts
+ * only at the start of a line, so a `//` inside a URL stays evidence. A
+ * genuine miss differs in an evidence character and is still reported, which
+ * `bundleGate.test.ts` proves for both a changed class name and a changed
+ * word. The tolerance is confined to a region already pinned at both ends by a
+ * quote, and the plain substring pass below stays byte exact.
+ */
+
+/** The literal spans of a replacement, and whether it holds an expression. */
+export interface ReplacementShape {
+  /** The text between the `${...}` spans. Always at least one element. */
+  readonly quasis: readonly string[];
+  /** True when the replacement holds at least one `${...}` expression. */
+  readonly hasExpressions: boolean;
+}
+
+/** True when the `${` at `index` is escaped, so it is literal text. */
+function isEscaped(text: string, index: number): boolean {
+  let backslashes = 0;
+  let i = index - 1;
+  while (i >= 0 && text[i] === '\\') {
+    backslashes++;
+    i--;
+  }
+  return backslashes % 2 === 1;
+}
+
+/** Index just after the closing quote of the string that opens at `open`. */
+function skipQuoted(text: string, open: number): number {
+  const quote = text[open];
+  let i = open + 1;
+  while (i < text.length) {
+    if (text[i] === '\\') {
+      i += 2;
+      continue;
+    }
+    if (text[i] === quote) {
+      return i + 1;
+    }
+    i++;
+  }
+  return -1;
+}
+
+/** Index just after the backtick that closes the template opening at `open`. */
+function skipTemplateLiteral(text: string, open: number): number {
+  let i = open + 1;
+  while (i < text.length) {
+    if (text[i] === '\\') {
+      i += 2;
+      continue;
+    }
+    if (text[i] === '`') {
+      return i + 1;
+    }
+    if (text[i] === '$' && text[i + 1] === '{') {
+      const after = skipExpression(text, i);
+      if (after < 0) {
+        return -1;
+      }
+      i = after;
+      continue;
+    }
+    i++;
+  }
+  return -1;
+}
+
+/**
+ * Index just after the `}` that closes the `${` at `open`, or -1 when the text
+ * holds no balanced close. A caller that gets -1 refuses the match, so the
+ * occurrence is reported rather than swallowed.
+ */
+function skipExpression(text: string, open: number): number {
+  let i = open + 2;
+  let depth = 1;
+  while (i < text.length) {
+    const c = text[i];
+    if (c === '\\') {
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      const after = skipQuoted(text, i);
+      if (after < 0) {
+        return -1;
+      }
+      i = after;
+      continue;
+    }
+    if (c === '`') {
+      const after = skipTemplateLiteral(text, i);
+      if (after < 0) {
+        return -1;
+      }
+      i = after;
+      continue;
+    }
+    if (c === '{') {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === '}') {
+      depth--;
+      i++;
+      if (depth === 0) {
+        return i;
+      }
+      continue;
+    }
+    i++;
+  }
+  return -1;
+}
+
+/**
+ * Split a replacement into its quasis, the literal spans between its `${...}`
+ * expressions.
+ *
+ * `\${` IS LITERAL TEXT, not the start of an expression. The GitHub Actions
+ * templates embed `\${{ env.TELEPORT_* }}` so the rendered workflow carries a
+ * literal `${`, and babel records no expression span there either.
+ *
+ * It THROWS on an unterminated expression, because that means the catalog holds
+ * text no source reader could have produced. Reporting a residual instead would
+ * hide a broken entry behind a run somebody would try to explain.
+ */
+export function replacementShape(replacement: string): ReplacementShape {
+  const quasis: string[] = [];
+  let cursor = 0;
+  let i = 0;
+  while (i < replacement.length) {
+    if (
+      replacement[i] === '$' &&
+      replacement[i + 1] === '{' &&
+      !isEscaped(replacement, i)
+    ) {
+      const after = skipExpression(replacement, i);
+      if (after < 0) {
+        throw new Error(
+          `psiphon-brand: the catalog replacement ${JSON.stringify(replacement.slice(0, 80))} opens an expression at offset ${i} that it never closes. ` +
+            'A replacement must carry its expression spans exactly as the source reader records them.'
+        );
+      }
+      quasis.push(replacement.slice(cursor, i));
+      cursor = after;
+      i = after;
+      continue;
+    }
+    i++;
+  }
+  quasis.push(replacement.slice(cursor));
+  return { quasis, hasExpressions: quasis.length > 1 };
+}
+
+/**
+ * The character references a JSX text node can carry. The layer 1 scanner reads
+ * the RAW text of the node, because the raw text is what the transform rewrites,
+ * so a catalog source holds `we&apos;ll`. The JSX transform decodes the
+ * reference, so the chunk holds `we'll`. The two texts are the same phrase and
+ * this entry provably produced both, which is why the substring pass searches
+ * for each of them.
+ *
+ * An unknown reference decodes to itself, so the occurrence stays reported. The
+ * failure direction is the loud one.
+ */
+const CHARACTER_REFERENCES: Readonly<Record<string, string>> = {
+  amp: '&',
+  apos: "'",
+  bull: '\u2022',
+  copy: '\u00a9',
+  deg: '\u00b0',
+  gt: '>',
+  hellip: '\u2026',
+  laquo: '\u00ab',
+  ldquo: '\u201c',
+  lsquo: '\u2018',
+  lt: '<',
+  mdash: '\u2014',
+  middot: '\u00b7',
+  nbsp: '\u00a0',
+  ndash: '\u2013',
+  quot: '"',
+  raquo: '\u00bb',
+  rdquo: '\u201d',
+  reg: '\u00ae',
+  rsquo: '\u2019',
+  times: '\u00d7',
+  trade: '\u2122',
+};
+
+/**
+ * Decode the character references in a JSX text node. Returns the text
+ * unchanged when it holds none, so a caller can compare by identity.
+ */
+export function decodeCharacterReferences(text: string): string {
+  if (!text.includes('&')) {
+    return text;
+  }
+  return text.replace(
+    /&(#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g,
+    (whole: string, body: string) => {
+      if (body[0] !== '#') {
+        return CHARACTER_REFERENCES[body] ?? whole;
+      }
+      const digits = body.slice(1);
+      const hex = digits[0] === 'x' || digits[0] === 'X';
+      const value = Number.parseInt(
+        hex ? digits.slice(1) : digits,
+        hex ? 16 : 10
+      );
+      return Number.isFinite(value) && value > 0 && value <= 0x10ffff
+        ? String.fromCodePoint(value)
+        : whole;
+    }
+  );
+}
+
+/** One consumable literal span of a matched bounded region. */
+interface RegionSpan {
+  readonly start: number;
+  readonly end: number;
+}
+
+const WHITESPACE = /\s/;
+
+/**
+ * The characters of a quasi that are evidence: everything that is neither
+ * whitespace nor inside a comment the CSS transform deletes.
+ *
+ * A `//` run counts as a comment ONLY when nothing but whitespace precedes it
+ * on its line. That keeps the `//` of a URL as evidence, which matters because
+ * a quasi can hold a documentation link.
+ */
+export function evidenceOf(quasi: string): string {
+  const out: string[] = [];
+  let atLineStart = true;
+  let i = 0;
+  while (i < quasi.length) {
+    const c = quasi[i];
+    if (WHITESPACE.test(c)) {
+      if (c === '\n') {
+        atLineStart = true;
+      }
+      i++;
+      continue;
+    }
+    if (c === '/' && quasi[i + 1] === '/' && atLineStart) {
+      const nl = quasi.indexOf('\n', i);
+      i = nl < 0 ? quasi.length : nl;
+      continue;
+    }
+    if (c === '/' && quasi[i + 1] === '*') {
+      const close = quasi.indexOf('*/', i + 2);
+      i = close < 0 ? quasi.length : close + 2;
+      continue;
+    }
+    out.push(c);
+    atLineStart = false;
+    i++;
+  }
+  return out.join('');
+}
+
+/** How many characters of a quasi are evidence. */
+export function evidenceLength(quasi: string): number {
+  return evidenceOf(quasi).length;
+}
+
+/** Index of the first character at or after `at` that is not whitespace. */
+function skipWhitespace(code: string, at: number): number {
+  let i = at;
+  while (i < code.length && WHITESPACE.test(code[i])) {
+    i++;
+  }
+  return i;
+}
+
+/**
+ * Match one quasi's evidence at `at`. Returns the offset just after the last
+ * matched character, or -1. The caller passes evidence rather than the raw
+ * quasi so the extraction happens once per entry, not once per candidate.
+ */
+function matchEvidence(code: string, evidence: string, at: number): number {
+  let i = at;
+  let end = at;
+  for (let j = 0; j < evidence.length; j++) {
+    while (i < code.length && WHITESPACE.test(code[i])) {
+      i++;
+    }
+    if (code[i] !== evidence[j]) {
+      return -1;
+    }
+    i++;
+    end = i;
+  }
+  return end;
+}
+
+/**
+ * Match `quasis` in order at `start`, as a COMPLETE quoted string. Returns the
+ * matched quasi spans, or null when the code does not hold that shape.
+ */
+export function matchBoundedRegion(
+  code: string,
+  quasis: readonly string[],
+  start: number,
+  evidence: readonly string[] = quasis.map(evidenceOf)
+): RegionSpan[] | null {
+  const opening = code[start - 1];
+  if (opening === undefined || !QUOTE_CHARACTERS.includes(opening)) {
+    return null;
+  }
+  const spans: RegionSpan[] = [];
+  let cursor = start;
+  for (let i = 0; i < quasis.length; i++) {
+    const end = matchEvidence(code, evidence[i], cursor);
+    if (end < 0) {
+      return null;
+    }
+    spans.push({ start: cursor, end });
+    // The quasi may end in whitespace the minifier removed, or the chunk may
+    // carry whitespace the quasi does not. Neither is evidence, so neither
+    // decides whether the next gap is where it should be.
+    cursor = skipWhitespace(code, end);
+    if (i === quasis.length - 1) {
+      break;
+    }
+    if (code[cursor] === '$' && code[cursor + 1] === '{') {
+      const after = skipExpression(code, cursor);
+      if (after < 0) {
+        return null;
+      }
+      cursor = after;
+      continue;
+    }
+    if (
+      code[cursor] === opening &&
+      code[cursor + 1] === ',' &&
+      code[cursor + 2] === opening
+    ) {
+      cursor += 3;
+      continue;
+    }
+    return null;
+  }
+  if (code[cursor] !== opening) {
+    return null;
+  }
+  return spans;
 }
 
 /**
@@ -390,6 +813,27 @@ export function validateBundleBaseline(
  * which is exactly why ADR 0007 keeps all five immutable entries: without them
  * this layer cannot tell a header it must leave alone from a phrase somebody
  * forgot.
+ *
+ * THE CATALOG IS READ IN TWO PASSES, and the narrower claim goes first.
+ *
+ *   Pass A, the bounded literal region. A template entry and a whole-node entry
+ *   are matched by their quasi sequence inside a complete quoted string. See
+ *   "THE BOUNDED LITERAL REGION" above for why a plain substring search cannot
+ *   reach either of them.
+ *
+ *   Pass B, the plain substring search, longest replacement first, byte exact,
+ *   as before. It also searches for the character-reference-decoded form of a
+ *   replacement, because a JSX text node reaches the chunk decoded. A template
+ *   entry stays in this pass too, because an unminified build holds the
+ *   replacement verbatim and the pass costs nothing.
+ *
+ * A NAMESPACE LITERAL OUTRANKS PASS A. `BUNDLE_NAMESPACE_LITERALS` names three
+ * anchored sites whose whole string is the bare lower-case word, and each one
+ * carries a HARD CAP. The whole-node catalog entry for the same word would take
+ * them first and leave those records matching nothing, which is
+ * `BUNDLE_RATCHET_FAIL`. Pass A therefore refuses any region holding an
+ * occurrence a namespace literal has claimed, so each mechanism keeps the sites
+ * it was measured against.
  */
 export function scanBundleResidual(
   chunk: string,
@@ -401,33 +845,121 @@ export function scanBundleResidual(
   literals: readonly BundleNamespaceLiteral[] = BUNDLE_NAMESPACE_LITERALS
 ): BundleScanResult {
   const consumed = new Uint8Array(code.length);
-  const surviving = sortLongestFirst(
-    catalog.filter(entry => /teleport/i.test(entry.replacement))
-  );
-  let accountedByCatalog = 0;
-  for (const entry of surviving) {
-    const needle = entry.replacement;
-    let from = 0;
-    for (;;) {
-      const at = code.indexOf(needle, from);
-      if (at < 0) {
-        break;
+  const holdsBrand = (text: string) => /teleport/i.test(text);
+  const lower = code.toLowerCase();
+
+  // Every offset a namespace literal claims. Pass A must not take one, or the
+  // three anchored design system records would match nothing and the ratchet
+  // would demand their removal for a reason that is not true.
+  const claimedByNamespace = new Set<number>();
+  for (
+    let at = lower.indexOf(BRAND_WORD);
+    at >= 0;
+    at = lower.indexOf(BRAND_WORD, at + 1)
+  ) {
+    const claimed = literals.some(candidate =>
+      namespaceLiteralMatches(candidate, code, at)
+    );
+    if (claimed) {
+      claimedByNamespace.add(at);
+    }
+  }
+
+  // Pass A. A template entry and a whole-node entry, by bounded literal region.
+  const bounded = catalog
+    .filter(entry => holdsBrand(entry.replacement))
+    .map(entry => {
+      const shape = replacementShape(entry.replacement);
+      return { entry, shape, evidence: shape.quasis.map(evidenceOf) };
+    })
+    .filter(
+      candidate =>
+        candidate.shape.hasExpressions || isWholeNodeEntry(candidate.entry)
+    )
+    .sort(
+      (a, b) =>
+        b.entry.replacement.length - a.entry.replacement.length ||
+        (a.entry.replacement < b.entry.replacement ? -1 : 1)
+    );
+  if (bounded.length > 0) {
+    // A bounded region opens right after a quote, and a quasi may begin with
+    // whitespace the minifier removed, so the candidate starts are the
+    // positions after every quote in the chunk rather than the offsets of any
+    // one needle.
+    const candidates: number[] = [];
+    for (let i = 0; i < code.length; i++) {
+      if (QUOTE_CHARACTERS.includes(code[i])) {
+        candidates.push(i + 1);
       }
-      const end = at + needle.length;
-      let free = true;
-      for (let i = at; i < end; i++) {
-        if (consumed[i]) {
-          free = false;
+    }
+    for (const { entry, shape, evidence } of bounded) {
+      const whole = isWholeNodeEntry(entry);
+      for (const at of candidates) {
+        const spans = matchBoundedRegion(code, shape.quasis, at, evidence);
+        if (!spans) {
+          continue;
+        }
+        const last = spans[spans.length - 1];
+        let claimed = false;
+        for (const offset of claimedByNamespace) {
+          if (offset >= spans[0].start && offset < last.end) {
+            claimed = true;
+            break;
+          }
+        }
+        if (claimed) {
+          continue;
+        }
+        for (let s = 0; s < spans.length; s++) {
+          // The short-quasi rule. A quasi with no more evidence than the brand
+          // word proves nothing, so it takes nothing. A declared whole-node
+          // entry is the one narrow exception.
+          if (!whole && evidence[s].length <= BRAND_WORD.length) {
+            continue;
+          }
+          for (let i = spans[s].start; i < spans[s].end; i++) {
+            consumed[i] = 1;
+          }
+        }
+      }
+    }
+  }
+
+  // Pass B. Every other entry, by plain byte-exact substring, longest first.
+  const surviving = sortLongestFirst(
+    catalog.filter(entry => holdsBrand(entry.replacement))
+  );
+  for (const entry of surviving) {
+    const decoded = decodeCharacterReferences(entry.replacement);
+    const needles =
+      decoded === entry.replacement
+        ? [entry.replacement]
+        : [entry.replacement, decoded];
+    for (const needle of needles) {
+      if (needle.length === 0) {
+        continue;
+      }
+      let from = 0;
+      for (;;) {
+        const at = code.indexOf(needle, from);
+        if (at < 0) {
           break;
         }
-      }
-      if (free) {
+        const end = at + needle.length;
+        let free = true;
         for (let i = at; i < end; i++) {
-          consumed[i] = 1;
+          if (consumed[i]) {
+            free = false;
+            break;
+          }
         }
-        accountedByCatalog++;
+        if (free) {
+          for (let i = at; i < end; i++) {
+            consumed[i] = 1;
+          }
+        }
+        from = at + 1;
       }
-      from = at + 1;
     }
   }
 
@@ -448,12 +980,14 @@ export function scanBundleResidual(
     exclusionHits[bundleNamespaceKey(literal)] = 0;
   }
 
-  const lower = code.toLowerCase();
   const grouped = new Map<
     string,
     { count: number; firstIndex: number; token: string; identifier: string }
   >();
   let total = 0;
+  // Counted as OCCURRENCES, not as matches, so the five accounting figures in
+  // the report add up to `totalOccurrences`.
+  let accountedByCatalog = 0;
   let accountedByHost = 0;
   let accountedByExclusion = 0;
   let accountedByNamespace = 0;
@@ -461,7 +995,9 @@ export function scanBundleResidual(
   let at = lower.indexOf(BRAND_WORD);
   while (at >= 0) {
     total++;
-    if (!consumed[at]) {
+    if (consumed[at]) {
+      accountedByCatalog++;
+    } else {
       const { run, start } = runAround(code, at);
       const namespace = literals.find(candidate =>
         namespaceLiteralMatches(candidate, code, at)

@@ -31,7 +31,11 @@ import { execFileSync } from 'child_process';
 import { readdirSync, readFileSync } from 'fs';
 import { dirname, join, relative, resolve } from 'path';
 
-import { EXCLUDED_HOSTS } from './brandCatalog';
+import {
+  BRAND_CATALOG,
+  EXCLUDED_HOSTS,
+  type BrandPhrase,
+} from './brandCatalog';
 import { isExcludedByHost } from './brandMatcher';
 import { psiphonBrandPlugin } from './brandPlugin';
 import {
@@ -46,10 +50,15 @@ import {
   assertBundleBaselineHealth,
   bundleExclusionKey,
   bundleNamespaceKey,
+  decodeCharacterReferences,
   evaluateBundleBaseline,
+  evidenceLength,
+  evidenceOf,
   formatBundleReport,
   identifierAround,
+  matchBoundedRegion,
   namespaceLiteralMatches,
+  replacementShape,
   ruleMatches,
   runAround,
   scanBundleResidual,
@@ -77,6 +86,19 @@ function rule(over: Partial<BundleCategoryRule> = {}): BundleCategoryRule {
     prefix: 'teleport.',
     tail: 'protobufTypePath',
     count: 1,
+    reason: 'a reason',
+    ...over,
+  };
+}
+
+/** A catalog entry shaped like a real one, so a test can vary one field. */
+function entry(over: Partial<BrandPhrase> = {}): BrandPhrase {
+  return {
+    source: 'teleport-placeholder',
+    replacement: 'teleport-placeholder',
+    count: 1,
+    tier: 'protocol',
+    immutable: true,
     reason: 'a reason',
     ...over,
   };
@@ -295,9 +317,15 @@ describe('the namespace literal, and why it cannot admit copy', () => {
     // cap, because this is the only key that can reach a one-word string.
     const capped = literal({ count: 1 });
     const twice = 'a={cssVarsPrefix:`teleport`};b={cssVarsPrefix:`teleport`};';
-    const result = scanBundleResidual('app/app.js', twice, [], [], [], [], [
-      capped,
-    ]);
+    const result = scanBundleResidual(
+      'app/app.js',
+      twice,
+      [],
+      [],
+      [],
+      [],
+      [capped]
+    );
     expect(result.accountedByNamespace).toBe(2);
     const verdict = evaluateBundleBaseline([result], [], [], [capped]);
     expect(verdict.overflow).toHaveLength(1);
@@ -437,6 +465,423 @@ describe('bundle exclusion list, what it admits', () => {
     expect(result.residualOccurrences).toBe(1);
     expect(result.residuals[0].token).toBe('teleport-not-on-the-list');
     expect(formatBundleReport([result], true)).toContain('1 unaccounted');
+  });
+});
+
+/**
+ * GAP 1. A template entry whose replacement keeps the brand word can never be
+ * found by searching the chunk for the replacement text, because the catalog
+ * holds `${moduleSrc}` and the minified chunk holds `${i}`. The quasis, the
+ * literal spans between the expressions, are what survive.
+ */
+describe('a template entry, consumed by its quasis', () => {
+  // Shaped like the two Terraform entries in the integrations-aws leaf: a
+  // template whose expressions the minifier renames and whose literal spans
+  // hold the upstream module variable names.
+  const terraform =
+    'module "aws_discovery" {\n  source  = ${moduleSrc}\n' +
+    "  teleport_proxy_public_addr    = ${cfg.proxyCluster + ':443'}\n" +
+    '  teleport_discovery_group_name = "cloud-discovery-group"\n}\n';
+  const emitted =
+    'var q=`module "aws_discovery" {\n  source  = ${i}\n' +
+    '  teleport_proxy_public_addr    = ${e.p+":443"}\n' +
+    '  teleport_discovery_group_name = "cloud-discovery-group"\n}\n`;';
+  const template = entry({ source: terraform, replacement: terraform });
+
+  it('splits a replacement into quasis, and keeps an escaped ${ as text', () => {
+    const shape = replacementShape('a ${x} b ${y.z + `q`} c');
+    expect(shape.quasis).toEqual(['a ', ' b ', ' c']);
+    expect(shape.hasExpressions).toBe(true);
+
+    // templates.ts embeds GitHub Actions syntax, where `\${` renders a literal
+    // `${`. Babel records no expression span there, so neither does this.
+    const actions = replacementShape('run: \\${{ env.TELEPORT_VERSION }}');
+    expect(actions.hasExpressions).toBe(false);
+    expect(actions.quasis).toEqual(['run: \\${{ env.TELEPORT_VERSION }}']);
+
+    // An unterminated span means the catalog holds text no source reader could
+    // have produced. Reporting a residual would hide a broken entry.
+    expect(() => replacementShape('a ${x')).toThrow(/never closes/);
+  });
+
+  it('every shipped catalog replacement parses into quasis', () => {
+    for (const shipped of BRAND_CATALOG) {
+      expect(() => replacementShape(shipped.replacement)).not.toThrow();
+    }
+  });
+
+  it('accounts the occurrences the minified template still holds', () => {
+    const before = scanBundleResidual('app/app.js', emitted, [], []);
+    expect(before.residualOccurrences).toBe(2);
+
+    const after = scanBundleResidual('app/app.js', emitted, [template], []);
+    expect(after.totalOccurrences).toBe(2);
+    expect(after.accountedByCatalog).toBe(2);
+    expect(after.residualOccurrences).toBe(0);
+  });
+
+  it('STILL REPORTS A GENUINE MISS of the same structural shape', () => {
+    // The same template shape with one variable name changed is a DIFFERENT
+    // string. No entry produced it, so it stays unaccounted. This is the
+    // property the whole layer exists for.
+    const miss = emitted.replace(
+      'teleport_proxy_public_addr',
+      'teleport_secret_backdoor'
+    );
+    const result = scanBundleResidual(
+      'app/app.js',
+      `${miss}var z="Welcome to Teleport";`,
+      [template],
+      []
+    );
+    expect(result.accountedByCatalog).toBe(0);
+    expect(result.residualOccurrences).toBe(3);
+    expect(result.residuals.map(r => r.token)).toContain(
+      'teleport_secret_backdoor'
+    );
+  });
+
+  it('consumes the quasi text only, never the minified expression', () => {
+    // The catalog provably produced the quasis. It did not produce
+    // `${e.teleportProxy}`, so an occurrence inside an expression is somebody
+    // else's to account.
+    const withExpression = entry({
+      source:
+        'addr = ${cfg.teleportProxy}\n  teleport_proxy_public_addr = ok\n',
+      replacement:
+        'addr = ${cfg.teleportProxy}\n  teleport_proxy_public_addr = ok\n',
+    });
+    const code =
+      'var q=`addr = ${e.teleportProxy}\n  teleport_proxy_public_addr = ok\n`;';
+    const result = scanBundleResidual('app/app.js', code, [withExpression], []);
+    expect(result.totalOccurrences).toBe(2);
+    expect(result.accountedByCatalog).toBe(1);
+    expect(result.residualOccurrences).toBe(1);
+    expect(result.residuals[0].identifier).toBe('teleportProxy');
+  });
+
+  it('refuses a region that is not a complete quoted string', () => {
+    // The quasis appear, in order, with the right expression shape between
+    // them, but inside a longer literal. The entry did not produce that.
+    const inside = emitted
+      .replace('var q=`', 'var q=`prefix ')
+      .replace('}\n`;', '}\nsuffix`;');
+    const result = scanBundleResidual('app/app.js', inside, [template], []);
+    expect(result.accountedByCatalog).toBe(0);
+    expect(result.residualOccurrences).toBe(2);
+  });
+
+  it('matchBoundedRegion needs the same quote on both ends', () => {
+    const shape = replacementShape('ab ${x} cd');
+    const good = 'q=`ab ${i} cd`;';
+    // A span stops at the last character that is evidence, so the trailing
+    // space of the first quasi is outside it.
+    expect(matchBoundedRegion(good, shape.quasis, good.indexOf('ab'))).toEqual([
+      { start: 3, end: 5 },
+      { start: 10, end: 13 },
+    ]);
+    const mixed = 'q=`ab ${i} cd";';
+    expect(matchBoundedRegion(mixed, shape.quasis, mixed.indexOf('ab'))).toBe(
+      null
+    );
+    const unquoted = 'q=(ab ${i} cd);';
+    expect(
+      matchBoundedRegion(unquoted, shape.quasis, unquoted.indexOf('ab'))
+    ).toBe(null);
+    // A symmetric delimiter that is not a quote does not bound a region
+    // either. Only a quote makes the match a complete string literal, which
+    // is what proves the entry produced the whole of it.
+    const symmetric = 'q=|ab ${i} cd|;';
+    expect(
+      matchBoundedRegion(symmetric, shape.quasis, symmetric.indexOf('ab'))
+    ).toBe(null);
+    // A gap that is neither `${...}` nor an array element boundary.
+    const noSpan = 'q=`ab XX cd`;';
+    expect(matchBoundedRegion(noSpan, shape.quasis, noSpan.indexOf('ab'))).toBe(
+      null
+    );
+  });
+});
+
+/**
+ * A TAGGED template is lowered to a call over an array of its quasis, and the
+ * styled-components transform MINIFIES the CSS on the way. Neither the whole
+ * replacement nor a single quasi survives byte for byte, so this shape has to
+ * be matched by its evidence: the non-whitespace characters, in order, inside
+ * one complete quoted string.
+ */
+describe('a tagged template, lowered to an array of quasis', () => {
+  // Shaped like design/src/RadioButton/RadioButton.tsx.
+  const css =
+    '\n  transition: all 150ms;\n\n' +
+    '  input:enabled:hover + &,\n' +
+    '  .teleport-radio-button__force-hover input + & {\n' +
+    '    background-color: ${props => props.theme.colors.hover};\n  }\n';
+  const styled = entry({ source: css, replacement: css });
+  const emitted =
+    'Lze=H.span([`transition:all 150ms;' +
+    'input:enabled:hover + &,.teleport-radio-button__force-hover input + &' +
+    '{background-color:`,`;}`],Rze);';
+
+  it('accounts the occurrence the minified CSS still holds', () => {
+    const before = scanBundleResidual('app/app.js', emitted, [], []);
+    expect(before.residualOccurrences).toBe(1);
+
+    const after = scanBundleResidual('app/app.js', emitted, [styled], []);
+    expect(after.accountedByCatalog).toBe(1);
+    expect(after.residualOccurrences).toBe(0);
+  });
+
+  it('STILL REPORTS A GENUINE MISS that differs in a real character', () => {
+    // Whitespace is not evidence. Everything else is. One changed class name
+    // is a different string and stays unaccounted.
+    const miss = emitted.replace('force-hover', 'force-hoverx');
+    const result = scanBundleResidual('app/app.js', miss, [styled], []);
+    expect(result.accountedByCatalog).toBe(0);
+    expect(result.residualOccurrences).toBe(1);
+    expect(result.residuals[0].token).toBe(
+      'teleport-radio-button__force-hoverx'
+    );
+  });
+
+  it('needs the array element boundary, not just the two quasis', () => {
+    // Drop the `,` that separates the two array elements and the shape is no
+    // longer a lowered tagged template.
+    const joined = emitted.replace('`,`;}`]', '`;}`]');
+    const result = scanBundleResidual('app/app.js', joined, [styled], []);
+    expect(result.accountedByCatalog).toBe(0);
+    expect(result.residualOccurrences).toBe(1);
+  });
+
+  it('evidenceLength counts characters, not whitespace', () => {
+    expect(evidenceLength('   \n\t  ')).toBe(0);
+    expect(evidenceLength(' teleport ')).toBe(8);
+    expect(evidenceLength(' teleport! ')).toBe(9);
+  });
+
+  it('a comment is not evidence, and the // of a URL still is', () => {
+    // The transform deletes a CSS comment outright, so no source text could
+    // ever match the chunk byte for byte.
+    expect(evidenceOf('\n  // reset the appearance\n  color: red;\n')).toBe(
+      'color:red;'
+    );
+    expect(evidenceOf('a /* gone */ b')).toBe('ab');
+    // A `//` counts only at the start of a line, so a link keeps every
+    // character it has. Without this rule a quasi holding a documentation URL
+    // would lose its tail and could match text the entry never produced.
+    expect(evidenceOf('see https://goteleport.com/docs now')).toBe(
+      'seehttps://goteleport.com/docsnow'
+    );
+  });
+
+  it('accounts a styled block whose comments the transform deleted', () => {
+    const commented = entry({
+      source:
+        '\n  // Note: the "force" classes are required for Storybook.\n' +
+        '  &:hover,\n  .teleport-checkbox__force-hover & {\n' +
+        '    background-color: ${props => props.theme.hover};\n  }\n',
+      replacement:
+        '\n  // Note: the "force" classes are required for Storybook.\n' +
+        '  &:hover,\n  .teleport-checkbox__force-hover & {\n' +
+        '    background-color: ${props => props.theme.hover};\n  }\n',
+    });
+    const emittedCss =
+      'wTe=H.input([`&:hover,.teleport-checkbox__force-hover &' +
+      '{background-color:`,`;}`],Rze);';
+    const before = scanBundleResidual('app/app.js', emittedCss, [], []);
+    expect(before.residualOccurrences).toBe(1);
+
+    const after = scanBundleResidual('app/app.js', emittedCss, [commented], []);
+    expect(after.accountedByCatalog).toBe(1);
+    expect(after.residualOccurrences).toBe(0);
+
+    // And a real character change is still a miss.
+    const changed = emittedCss.replace('&:hover', '&:focus');
+    const missed = scanBundleResidual('app/app.js', changed, [commented], []);
+    expect(missed.accountedByCatalog).toBe(0);
+    expect(missed.residualOccurrences).toBe(1);
+  });
+});
+
+/**
+ * A JSX text node reaches the chunk with its character references DECODED, and
+ * the layer 1 scanner reads the raw text, because the raw text is what the
+ * transform rewrites. The entry provably produced both forms.
+ */
+describe('a JSX text entry that carries a character reference', () => {
+  it('decodes a named reference and a numeric one', () => {
+    expect(decodeCharacterReferences('we&apos;ll')).toBe("we'll");
+    expect(decodeCharacterReferences('didn&#39;t')).toBe("didn't");
+    expect(decodeCharacterReferences('a&#x27;b')).toBe("a'b");
+    expect(decodeCharacterReferences('plain text')).toBe('plain text');
+    // An unknown reference decodes to itself, so the occurrence is reported.
+    expect(decodeCharacterReferences('a&notarealref;b')).toBe(
+      'a&notarealref;b'
+    );
+  });
+
+  it('accounts the decoded phrase the chunk actually holds', () => {
+    const raw =
+      'After running the command above, we&apos;ll automatically detect your new Teleport instance.';
+    const jsx = entry({ source: raw, replacement: raw });
+    const code =
+      "J,{children:`After running the command above, we'll automatically detect your new Teleport instance.`}";
+    const before = scanBundleResidual('app/app.js', code, [], []);
+    expect(before.residualOccurrences).toBe(1);
+
+    const after = scanBundleResidual('app/app.js', code, [jsx], []);
+    expect(after.accountedByCatalog).toBe(1);
+    expect(after.residualOccurrences).toBe(0);
+  });
+
+  it('STILL REPORTS a phrase the decoded form does not produce', () => {
+    const raw = 'we&apos;ll detect your new Teleport instance.';
+    const jsx = entry({ source: raw, replacement: raw });
+    const code = "`we'll detect your old Teleport instance.`";
+    const result = scanBundleResidual('app/app.js', code, [jsx], []);
+    expect(result.accountedByCatalog).toBe(0);
+    expect(result.residualOccurrences).toBe(1);
+  });
+});
+
+/**
+ * THE SHORT AND EMPTY QUASI. A quasi is the only thing this mechanism proves,
+ * so a quasi carrying no more than the brand word proves nothing.
+ */
+describe('a short or empty quasi', () => {
+  it('A QUASI NO LONGER THAN THE BRAND WORD TAKES NOTHING', () => {
+    // The whole literal content is an expression, the bare word, an
+    // expression. Two different templates could have that shape, so consuming
+    // it would let one entry swallow another module's miss.
+    const bare = entry({
+      source: '${a}teleport${b}',
+      replacement: '${a}teleport${b}',
+    });
+    const code = 'var q=`${i}teleport${o}`;';
+    const result = scanBundleResidual('app/app.js', code, [bare], []);
+    expect(result.accountedByCatalog).toBe(0);
+    expect(result.residualOccurrences).toBe(1);
+    expect(formatBundleReport([result], true)).toContain('1 unaccounted');
+  });
+
+  it('an empty quasi is not a special case: it forces its neighbours', () => {
+    // Leading and trailing empty quasis. The region must open with a quote
+    // immediately followed by `${`, and close with `}` immediately followed by
+    // the same quote. The one long quasi in the middle is what gets consumed.
+    const edged = entry({
+      source: '${a} the Teleport cluster name ${b}',
+      replacement: '${a} the Teleport cluster name ${b}',
+    });
+    const shape = replacementShape(edged.replacement);
+    expect(shape.quasis).toEqual(['', ' the Teleport cluster name ', '']);
+
+    const exact = 'var q=`${i} the Teleport cluster name ${o}`;';
+    const hit = scanBundleResidual('app/app.js', exact, [edged], []);
+    expect(hit.accountedByCatalog).toBe(1);
+    expect(hit.residualOccurrences).toBe(0);
+
+    // The same quasi inside a longer literal is refused, because the empty
+    // quasi puts the quote right against the first `${`.
+    const padded = 'var q=`prefix ${i} the Teleport cluster name ${o} tail`;';
+    const missed = scanBundleResidual('app/app.js', padded, [edged], []);
+    expect(missed.accountedByCatalog).toBe(0);
+    expect(missed.residualOccurrences).toBe(1);
+  });
+
+  it('an empty replacement still yields one quasi', () => {
+    expect(replacementShape('').quasis).toEqual(['']);
+    expect(replacementShape('${a}${b}').quasis).toEqual(['', '', '']);
+  });
+});
+
+/**
+ * GAP 2. `sortLongestFirst` drops a whole-node entry, and that filter must
+ * stay: an immutable bare-word entry matched as a substring would account
+ * every lower-case occurrence in the product in one sweep. The chunk-side
+ * analogue of a whole node is a COMPLETE QUOTED STRING, which is the shape
+ * amendment 8 already uses for the namespace literal.
+ */
+describe('a whole-node entry, consumed as a complete quoted string', () => {
+  const wholeNode = entry({
+    source: 'teleport',
+    replacement: 'teleport',
+    match: 'wholeNode',
+  });
+
+  it('takes a complete quoted word and NOTHING inside a longer string', () => {
+    const code =
+      'a={subKind:`teleport`};b=`gravitational/teleport`;' +
+      'c="Welcome to teleport";d=`teleport`;e="teleport-kube-agent";';
+    const result = scanBundleResidual('app/app.js', code, [wholeNode], []);
+    expect(result.totalOccurrences).toBe(5);
+    expect(result.accountedByCatalog).toBe(2);
+    expect(result.residualOccurrences).toBe(3);
+    expect(result.residuals.map(r => r.token).sort()).toEqual([
+      'gravitational/teleport',
+      'teleport',
+      'teleport-kube-agent',
+    ]);
+  });
+
+  it('STILL REPORTS EVERY OCCURRENCE when no whole literal is present', () => {
+    // The measured hazard: ref-o74l.3.10 found that a substring reading of
+    // this entry hid 401 unaccounted runs. With no complete quoted word in the
+    // chunk the entry accounts nothing at all.
+    const code = 'a=`gravitational/teleport`;b="teleport-kube-agent";';
+    const result = scanBundleResidual('app/app.js', code, [wholeNode], []);
+    expect(result.accountedByCatalog).toBe(0);
+    expect(result.residualOccurrences).toBe(2);
+  });
+
+  it('DOES NOT TAKE A NAMESPACE LITERAL SITE, so that ratchet stays quiet', () => {
+    // Both mechanisms can reach a complete `teleport` literal. The namespace
+    // literal is the narrower key, it names its site and it carries a hard
+    // cap, so it keeps the position it was measured against. Without this the
+    // three design system records would match nothing and demand removal.
+    const code = 'a=Yd({cssVarsPrefix:`teleport`});b={subKind:`teleport`};';
+    const result = scanBundleResidual(
+      'app/app.js',
+      code,
+      [wholeNode],
+      [],
+      [],
+      [],
+      [literal()]
+    );
+    expect(result.accountedByNamespace).toBe(1);
+    expect(result.accountedByCatalog).toBe(1);
+    expect(result.residualOccurrences).toBe(0);
+    const verdict = evaluateBundleBaseline([result], [], [], [literal()]);
+    expect(verdict.obsolete).toEqual([]);
+    expect(verdict.overflow).toEqual([]);
+  });
+
+  it('the five accounting figures add up to the total', () => {
+    const code =
+      'a=Yd({cssVarsPrefix:`teleport`});b={subKind:`teleport`};' +
+      'c="https://goteleport.com/docs";d="ace-teleport";' +
+      'e="Welcome to Teleport";';
+    const result = scanBundleResidual(
+      'app/app.js',
+      code,
+      [wholeNode],
+      EXCLUDED_HOSTS,
+      [record({ token: 'ace-teleport' })],
+      [],
+      [literal()]
+    );
+    expect(
+      result.accountedByCatalog +
+        result.accountedByHost +
+        result.accountedByExclusion +
+        result.accountedByNamespace +
+        result.residualOccurrences
+    ).toBe(result.totalOccurrences);
+    expect(result.accountedByCatalog).toBe(1);
+    expect(result.accountedByHost).toBe(1);
+    expect(result.accountedByExclusion).toBe(1);
+    expect(result.accountedByNamespace).toBe(1);
+    expect(result.residualOccurrences).toBe(1);
   });
 });
 
@@ -584,7 +1029,9 @@ describe('every ?raw asset that ships is free of the brand word', () => {
     expect(imports.length).toBeGreaterThanOrEqual(17);
     expect(imports.every(i => i.asset.endsWith('.yaml'))).toBe(true);
     expect(
-      imports.some(i => i.asset.endsWith('AuthConnectors/templates/github.yaml'))
+      imports.some(i =>
+        i.asset.endsWith('AuthConnectors/templates/github.yaml')
+      )
     ).toBe(true);
   });
 
