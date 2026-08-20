@@ -696,7 +696,9 @@ export const INTEGRATIONS_AWS_ENTRIES: readonly BrandPhrase[] = [
   {
     source: 'teleport-kube-agent',
     replacement: 'teleport-kube-agent',
-    count: 6,
+    // 3, not 6. The other three sites sit inside discover-enrolment baselined
+    // phrases, and the longest-match-first ordering gives them to that leaf.
+    count: 3,
     tier: 'protocol',
     immutable: true,
     reason:
