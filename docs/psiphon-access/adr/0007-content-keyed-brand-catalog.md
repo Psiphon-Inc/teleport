@@ -920,6 +920,115 @@ it cannot tell a header it must leave alone from a phrase somebody forgot. The
 catalog keeps all five immutable entries.
 
 
+## Amendment 5. A dated bundle-side exclusion list, made on 2026-08-19
+
+Layer 2 reads the emitted bundle. Some occurrences there have no source-side
+representation that a content-keyed catalog entry can reach, so layer 1 cannot
+account them and layer 2 would fail for ever once strict enforcement switched
+itself on. `ref-o74l.3.6` measured the size of that problem on a real build at
+`e94e5af620c`. The bundle holds 819 occurrences of the word. The catalog
+accounts 6 and an excluded host accounts 170. Of the 643 that remain, 497 come
+from a phrase that a source baseline entry already admits, and an authoring
+child converts each of those to a catalog entry. The other 146 cannot be
+reached from source.
+
+This record therefore adds a third accounting mechanism to layer 2, in
+`web/packages/teleport/src/psiphonBrand/bundleBaseline.ts`. It is a dated list
+with a reason for every record, in the shape of the `psiphonContrast` baseline,
+and it has ITS OWN RATCHET.
+
+**What may go in it.** Exactly two reasons admit a record, and every record
+states which one applies.
+
+1. The occurrence is an identifier or a property name. The algorithm above
+   forbids the scanner from visiting an identifier, so no `source` string can
+   ever name one.
+2. The occurrence comes from a module outside the layer 1 scan set and outside
+   the plugin transform. A dependency, a generated protobuf module and a `.jsx`
+   module all sit outside it.
+
+**What may not go in it.** Copy. An unbranded phrase that a user reads belongs
+in a catalog leaf, or in that leaf's source baseline until an authoring child
+reaches it.
+
+**The key.** A record names a `token`, which is the longest run of
+`[A-Za-z0-9_$./@-]` around the occurrence with any leading or trailing `.`, `/`
+and `@` trimmed, or an `identifier`, which is the longest run of
+`[A-Za-z0-9_$]`. It never names the surrounding run. A run in a minified bundle
+holds neighbouring generated names such as `e` and `DLe`, and those change on an
+unrelated dependency bump. Run keying produced 237 groups and token keying
+produced 200, and every one of the 37 that merged had swallowed minified code.
+
+**Records and rules.** The list holds 33 records and 2 named category rules,
+admitting 158 occurrences. A rule stands in for a category whose membership a
+generator decides, so that listing the members one by one would fail the build
+on a regeneration that changed nothing a reader can see. Two categories qualify:
+the protobuf message type paths under `gen/proto/ts`, which protoc decides, and
+the design system CSS custom properties, whose surviving set is whatever tree
+shaking keeps. Everything else is a record, because a record names one thing and
+a reader can check it.
+
+**Two structural guards keep copy out**, and `bundleGate.test.ts` asserts both.
+No record and no rule prefix may omit the brand word, and each must be strictly
+longer than it. A rule with the prefix `teleport` is therefore unexpressible,
+which is the narrower restatement of the ban this record already places on a
+regular expression over the bare word.
+
+**The ratchet.** A record or a rule that matches nothing in the emitted bundle
+raises `BUNDLE_RATCHET_FAIL` and fails the build until somebody removes it, so
+the list can only shrink. The ratchet runs in report mode as well as in strict
+mode, because the health of the list does not depend on how far the rebrand has
+got. It fires on presence and not on count. A count that moved is printed and is
+not fatal, because keying a failure on an occurrence count would fire on any
+dependency bump that added one CSS selector, and a gate that cries wolf gets
+deleted.
+
+**Two alternatives were rejected.** A narrower layer 2 rule that inspected only
+string-shaped regions would weaken the guarantee, because a minified property
+name is not in a string. Permanent report mode is a gate that cannot fail, and
+therefore is not a gate.
+
+
+## Amendment 6. What the exclusion list does not close, measured on 2026-08-19
+
+`ref-o74l.3.6` built the tree with every source baseline emptied and every
+catalog leaf filled, which is the state that turns strict enforcement on. Four
+occurrences survived, and neither the catalog nor the exclusion list can take
+them.
+
+- Three occurrences where the whole string is the bare lower-case word, all of
+  them the design system CSS variable namespace: `cssVarsPrefix`, the preset
+  `name`, and the token path lookup. A record cannot name them, because the
+  structural guard forbids a record as short as the brand word, and that guard
+  is what keeps copy out. They need a decision about the namespace, not an
+  exclusion.
+- One occurrence of user-visible copy at
+  `web/packages/teleport/src/AuthConnectors/templates/github.yaml:16`, which the
+  auth connector editor shows to a user. It reaches the bundle through `?raw`,
+  so neither the layer 1 scan set nor the transform sees it. It is copy, so it
+  must not enter the exclusion list. Either the transform grows to cover a
+  `?raw` template, or the fork edits that one committed line.
+
+A SEPARATE OBSTACLE STOPS STRICT MODE TODAY, and it is not in the list above.
+`ref-o74l.3.7` measured that two source baseline entries hold the bare word on
+its own, `Teleport` at 5 sites and `teleport` at 22. Decision 2 of this record
+forbids the bare word as a catalog source, and a test enforces that ban, so no
+authoring child can move those 27 sites out of the baseline. The source baseline
+therefore cannot reach zero, and strict enforcement cannot switch itself on.
+Both facts are true at the same time and both need an answer before the last
+authoring child lands.
+
+
+## A correction to this record's own assumption
+
+This record assumed the residual occurrences in the bundle were not copy.
+`ref-o74l.3.6` measured otherwise. With the seven source baselines emptied and
+no catalog entry written, 335 of the residual runs are the bare word inside
+prose, such as `Welcome to Teleport` and `Please ask your Teleport administrator
+to update your role`. Emptying a baseline flips the strict switch and rewrites
+nothing. Only an authoring child removes copy from the bundle, so the two must
+land together.
+
 ## Relationship to other records
 
 ADR 0006 fixes the names. The branding identifier is `psiphon` and the product
