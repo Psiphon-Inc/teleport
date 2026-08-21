@@ -23,6 +23,19 @@ Where it no longer matches the code, the code wins. The differences, measured on
 The fork also gained a product identity after this was written: it is Psiphon
 Access, and the branding surface is not covered here at all.
 
+> **Amendment, 2026-08-17. The counts in this document are no longer targets.**
+> The operator replaced the numeric cap with a standing goal: keep the modified
+> upstream surface small, and justify every addition with a churn measurement.
+> The root `README.md` holds the current statement and the commands.
+>
+> Under that goal the shipped Go count moved from two to three. A telemetry
+> audit found that the auth server read the upstream github releases api about
+> every 24 hours, which disclosed the egress address of the deployment to a
+> third party and could not be turned off by configuration.
+> `lib/versioncontrol/github/github.go` now refuses that request. The file takes
+> about 5 commits every three years, and every one of them was mechanical, so
+> the rebase tax is small and the request is gone. See ref-opqi.
+
 ---
 
 ## Goal
@@ -176,6 +189,14 @@ the three are candidates to upstream, which would leave one.
 > live and the fork still inherits it. It is tracked as ref-sojc, which also
 > holds the decision about whether to carry a local patch. Taking that patch
 > would move the count back to three.
+
+> **Amendment, 2026-08-17.** A fourth row now belongs in this table:
+> `lib/versioncontrol/github/github.go`, about 12 lines of comment and one
+> changed statement, 5 commits over three years, all mechanical. It stops the
+> auth server reading the upstream github releases api every 24 hours. It is not
+> a candidate to upstream, because upstream wants that request. The patch site
+> is `Visit`, not `getPage`, which keeps the scraper and its two opt-in
+> `TEST_GITHUB_API` tests working and costs no test churn. See ref-opqi.
 
 ### Patches that disappear
 

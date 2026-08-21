@@ -21,6 +21,17 @@ Two statements below are now wrong. Group membership uses DIRECT Cloud Identity
 lookup only, because transitive lookup and its fallback were removed. The `tctl`
 Google preset was never built and does not exist.
 
+> **Amendment, 2026-08-17.** The third bullet above is superseded. The fork
+> modifies three upstream Go files, not two. The third is
+> `lib/versioncontrol/github/github.go`, which now refuses the request the auth
+> server made to the upstream github releases api about every 24 hours.
+>
+> The count is also no longer a rule. The operator replaced the cap with a
+> standing goal: keep the modified upstream surface small, and justify each
+> addition with a churn measurement. The decision this record holds, to reuse
+> the upstream OIDC connector, is unaffected. See ref-opqi and the root
+> `README.md`.
+
 ---
 
 

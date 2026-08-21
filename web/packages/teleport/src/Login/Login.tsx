@@ -122,8 +122,8 @@ function SourceOffer() {
   return (
     <SourceOfferBox>
       <Text typography="body3">
-        Psiphon Access is based on Teleport by Gravitational, Inc. It is not
-        affiliated with, nor endorsed by, Gravitational, Inc.
+        Psiphon Access, based on Teleport by Gravitational, Inc. Not affiliated
+        with or endorsed by Gravitational, Inc.
       </Text>
       <Text typography="body3">
         This is modified free software under the{' '}
@@ -227,30 +227,11 @@ function LicenseAcknowledgement({
         </ButtonPrimary>
       </LicenseBox>
       <Footer>
-        <Text>©Gravitational, Inc. All Rights Reserved</Text>
-        <FooterLink
-          as="a"
-          href="https://goteleport.com/legal/tos/"
-          target="_blank"
-        >
-          Terms of Service
-        </FooterLink>
-        <FooterLink
-          as="a"
-          href="https://goteleport.com/legal/privacy/"
-          target="_blank"
-        >
-          Privacy Policy
-        </FooterLink>
+        <Text>© Psiphon Inc. Portions © Gravitational, Inc.</Text>
       </Footer>
     </>
   );
 }
-
-const FooterLink = styled(Text)`
-  color: ${props => props.theme.colors.text.main};
-  text-decoration: none;
-`;
 
 const Footer = styled(Flex)`
   width: 100%;
