@@ -171,6 +171,68 @@ It must print the three Go files and the twenty-one files above, and nothing
 else. The number is not a cap. The fork keeps the modified upstream surface
 small as a goal, and the root `README.md` states how an addition is justified.
 
+## Third-party dependencies the fork added
+
+Audited on 2026-08-21 against the fork base `e0d3c67924a`, at `848d1057b32`.
+
+The fork adds no Go dependency. `go.mod` and `go.sum` are byte-identical to the
+base. Measure it again with this command, which must print nothing:
+
+```
+git diff e0d3c67924a..HEAD -- go.mod go.sum
+```
+
+`google.golang.org/api` is often named as a fork addition, because the Cloud
+Identity group lookup uses it. That is wrong. Upstream already requires it at
+`go.mod:266`, version `v0.286.0`. The fork imports a package upstream already
+carried.
+
+The fork adds no web package either. It PROMOTES two packages from transitive
+to declared, both as `devDependencies` of `web/packages/teleport`:
+
+| Package | Version | Licence | Used by |
+|---|---|---|---|
+| `@babel/parser` | `^7.29.7` | MIT | `psiphonBrand/brandMatcher.ts:29` |
+| `magic-string` | `^0.30.21` | MIT | `psiphonBrand/brandPlugin.ts:35` |
+
+The promotion adds no third-party code to the tree. `pnpm-lock.yaml` gains six
+lines, and all six are importer entries that name a version the lock already
+resolved. The `packages:` section gains nothing. A declared dependency that was
+already present transitively introduces no new licence obligation, because the
+code was already here.
+
+MIT is compatible with AGPL-3.0 distribution. An AGPL-3.0 work may incorporate
+MIT code as long as the MIT notice is preserved with it.
+
+### Neither package reaches a distributed artifact
+
+Both run inside the Node build process and neither is part of the browser
+bundle. Two independent checks agree.
+
+The import graph reaches them only from build code. `psiphonBrand` is named by
+`web/packages/build/vite/config.ts:30` and `:134`, by its own two test files,
+and by nothing else. No application module imports it.
+
+The emitted bundle holds no trace of them. Decompress `app.js.br` and count:
+`MagicString` 0, `magic-string` 0, `@babel/parser` 0, `sourcemap-codec` 0,
+`psiphonBrand` 0, in 4,884,105 bytes.
+
+So no notice for either package needs to travel with the container image. The
+image carries the built assets and the Go binary. It does not carry the build
+tooling.
+
+### What this audit does not cover
+
+It covers the dependencies the FORK ADDED, and that set is empty. It says
+nothing about the dependencies upstream already carried, which the Go binary
+statically links and the container image therefore distributes. The repository
+root holds `LICENSE` and no `NOTICE` file, and `tool/teleport-google/Dockerfile`
+copies no third-party notice. Whether that is a gap is a question about the
+upstream dependency set, not about this fork's additions. It is tracked
+separately.
+
+This is not legal advice.
+
 ## Rendered service footers
 
 Recorded on 2026-08-19.
