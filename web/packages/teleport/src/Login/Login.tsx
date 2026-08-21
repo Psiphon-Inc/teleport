@@ -122,8 +122,8 @@ function SourceOffer() {
   return (
     <SourceOfferBox>
       <Text typography="body3">
-        Psiphon Access is based on Teleport by Gravitational, Inc. It is not
-        affiliated with, nor endorsed by, Gravitational, Inc.
+        Psiphon Access, based on Teleport by Gravitational, Inc. Not affiliated
+        with or endorsed by Gravitational, Inc.
       </Text>
       <Text typography="body3">
         This is modified free software under the{' '}

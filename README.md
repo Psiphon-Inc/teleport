@@ -1,7 +1,7 @@
 # Psiphon Access
 
-Psiphon Access is based on Teleport by Gravitational, Inc. It is not
-affiliated with, nor endorsed by, Gravitational, Inc.
+Psiphon Access, based on Teleport by Gravitational, Inc. Not affiliated with or
+endorsed by Gravitational, Inc.
 
 Psiphon Access is Psiphon's internal fork of Teleport. It adds Google
 Workspace login and Google group role mapping, and changes nothing else. It is
@@ -139,5 +139,5 @@ Teleport at commit `e0d3c67924a`.
 
 "Teleport" and the Teleport logo are trademarks of Gravitational, Inc. They are
 used here only to say truthfully what this software is derived from. Psiphon
-Access is based on Teleport by Gravitational, Inc., and is not affiliated with,
-nor endorsed by, Gravitational, Inc.
+Access, based on Teleport by Gravitational, Inc. Not affiliated with or endorsed
+by Gravitational, Inc.

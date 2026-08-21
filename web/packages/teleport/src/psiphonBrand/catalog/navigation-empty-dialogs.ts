@@ -180,9 +180,9 @@ export const NAVIGATION_EMPTY_DIALOGS_ENTRIES: readonly BrandPhrase[] = [
   },
   {
     source:
-      'Psiphon Access is based on Teleport by Gravitational, Inc. It is not affiliated with, nor endorsed by, Gravitational, Inc.',
+      'Psiphon Access, based on Teleport by Gravitational, Inc. Not affiliated with or endorsed by Gravitational, Inc.',
     replacement:
-      'Psiphon Access is based on Teleport by Gravitational, Inc. It is not affiliated with, nor endorsed by, Gravitational, Inc.',
+      'Psiphon Access, based on Teleport by Gravitational, Inc. Not affiliated with or endorsed by Gravitational, Inc.',
     count: 1,
     tier: 'render',
     immutable: true,
