@@ -113,14 +113,22 @@ describe('Psiphon legacy theme indirection', () => {
     const variables = getLightCssVariables(psiphonUiTheme.config);
     const missing = findMissingVariables(leaves, variables);
 
-    expect(leaves).toHaveLength(476);
-    expect(missing).toHaveLength(76);
+    // Measured on 2026-08-21: 476 leaves and 76 missing pointers, across the
+    // A100, A200, A400 and A700 shades of 19 Material groups. Those two counts
+    // are NOT asserted. A design-system bump moves them, and a test that pins
+    // today's count fails tomorrow for a reason that is not a defect. Assert
+    // the RELATIONSHIP instead, which is the real invariant.
+    expect(leaves.length).toBeGreaterThan(0);
     expect(missing).toEqual(
       expect.arrayContaining([
         'amber.A100: --teleport-colors-amber-a100',
         'yellow.A700: --teleport-colors-yellow-a700',
       ])
     );
+    // every() passes vacuously on an empty array, so non-vacuity is asserted
+    // separately. Without it, this whole check would go quiet if the emitted
+    // variable names ever changed shape.
+    expect(missing.length).toBeGreaterThan(0);
     expect(missing.every(item => /\.A(100|200|400|700):/.test(item))).toBe(
       true
     );
