@@ -111,7 +111,7 @@ If the fork had chosen Option A (referencing), the CSS font stack would be `Inte
    File `webassets_embed.go` line 1 uses build tags `//go:build webassets_embed && !webassets_ent`. Line 31 embeds assets:
    `//go:embed webassets/teleport`
    `var embedded embed.FS`
-   Function `NewWebAssetsFilesystem()` at line 36 serves `webassets/teleport` via `fs.Sub(embedded, "webassets/teleport")`. The build command in `README.md` line 74 (`go build -tags webassets_embed -o build/teleport ./tool/teleport-google/`) embeds the font files into the executable binary.
+   Function `NewWebAssetsFilesystem()` at line 36 serves `webassets/teleport` via `fs.Sub(embedded, "webassets/teleport")`. The build command in `README.md` (`go build -tags webassets_embed -o build/teleport ./tool/teleport`) embeds the font files into the executable binary.
 
 
 ## Monospace family governance

@@ -32,10 +32,12 @@ Two limits worth knowing before you deploy it:
 
 ## How it stays close to upstream
 
-The fork is deliberately small, so that following upstream stays cheap. All fork
-code lives in `lib/googleoidc/` and `tool/teleport-google/`, and it attaches
-through seams upstream already provides: the `modules.Modules` interface, the
-plugin registry, and the `auth.OIDCService` interface.
+The fork is deliberately small, so that following upstream stays cheap. Fork-
+original code lives in `lib/googleoidc/` and `tool/teleport-google/assets/`.
+The server entrypoint is `tool/teleport`, which calls `googleoidc.Activate`.
+The feature attaches through seams upstream already provides: the
+`modules.Modules` interface, the plugin registry, and the `auth.OIDCService`
+interface.
 
 Keeping the modified upstream surface small is a **standing goal, not a count**.
 There is no cap. Grow that surface when the change buys something no seam can
@@ -71,7 +73,7 @@ ironrdp WebAssembly package.
 
 ```bash
 # The fork binary. Google login is compiled in but off by default.
-go build -tags webassets_embed -o build/teleport ./tool/teleport-google/
+go build -tags webassets_embed -o build/teleport ./tool/teleport
 
 # The clients, unchanged from upstream.
 go build -o build/tctl ./tool/tctl/

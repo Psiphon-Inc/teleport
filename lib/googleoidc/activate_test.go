@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package main
+package googleoidc
 
 import (
 	"testing"
@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/gravitational/teleport/entitlements"
-	"github.com/gravitational/teleport/lib/googleoidc"
 	"github.com/gravitational/teleport/lib/modules"
 )
 
@@ -41,47 +40,53 @@ func oidcEntitlementLive() bool {
 	return modules.GetModules().Features().GetEntitlement(entitlements.OIDC).Enabled
 }
 
-// TestActivateGoogleOIDCCallsTheRealEntrypoint calls activateGoogleOIDC itself
-// rather than reproducing what it does.
-//
-// lib/googleoidc/activation_test.go re-creates the same two steps in order, so
-// it proves the library supports the wiring. It cannot prove that main.go
-// still performs it: deleting modules.SetModules from activateGoogleOIDC
-// leaves that test green. This test is the one that fails when the entrypoint
-// stops activating the feature.
-func TestActivateGoogleOIDCCallsTheRealEntrypoint(t *testing.T) {
+func TestActivate(t *testing.T) {
 	t.Run("enabled installs the wrapper and registers the plugin", func(t *testing.T) {
 		restoreModules(t)
-		t.Setenv(GoogleOIDCEnableEnvVar, "true")
+		t.Setenv(EnableEnvVar, "true")
 
 		require.False(t, oidcEntitlementLive(),
 			"precondition: the OIDC entitlement must be closed before activation")
 
-		registry := activateGoogleOIDC()
-
+		registry, err := Activate()
+		require.NoError(t, err)
 		require.NotNil(t, registry, "activation must return a registry to hand to common.Run")
 		require.True(t, oidcEntitlementLive(),
-			"activateGoogleOIDC must install the entitlement wrapper, or the gate stays shut")
-		require.True(t, registry.IsRegistered(googleoidc.PluginName),
-			"activateGoogleOIDC must register the fork plugin, or no OIDC route is served")
+			"Activate must install the entitlement wrapper, or the gate stays shut")
+		require.True(t, registry.IsRegistered(PluginName),
+			"Activate must register the fork plugin, or no OIDC route is served")
 	})
 
 	t.Run("unset leaves the process untouched", func(t *testing.T) {
 		restoreModules(t)
 
-		require.Nil(t, activateGoogleOIDC(),
-			"an unset flag must not build a registry")
+		registry, err := Activate()
+		require.NoError(t, err)
+		require.Nil(t, registry, "an unset flag must not build a registry")
 		require.False(t, oidcEntitlementLive(),
 			"an unset flag must leave the OIDC entitlement closed")
 	})
 
 	t.Run("explicitly false leaves the process untouched", func(t *testing.T) {
 		restoreModules(t)
-		t.Setenv(GoogleOIDCEnableEnvVar, "false")
+		t.Setenv(EnableEnvVar, "false")
 
-		require.Nil(t, activateGoogleOIDC(),
-			"a false flag must not build a registry")
+		registry, err := Activate()
+		require.NoError(t, err)
+		require.Nil(t, registry, "a false flag must not build a registry")
 		require.False(t, oidcEntitlementLive(),
 			"a false flag must leave the OIDC entitlement closed")
+	})
+
+	t.Run("unparseable value is an error and does not enable the feature", func(t *testing.T) {
+		restoreModules(t)
+		t.Setenv(EnableEnvVar, "maybe")
+
+		registry, err := Activate()
+		require.Error(t, err)
+		require.ErrorContains(t, err, EnableEnvVar)
+		require.Nil(t, registry)
+		require.False(t, oidcEntitlementLive(),
+			"a bad value must not enable the entitlement")
 	})
 }

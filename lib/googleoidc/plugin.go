@@ -60,7 +60,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) GetName() string { return PluginName }
 
 // Install registers the plugin and its process hook on a registry. Call it
-// from the fork main, before service.NewTeleport.
+// from Activate, before service.NewTeleport.
 func Install(registry plugin.Registry) error {
 	if registry == nil {
 		return trace.BadParameter("missing plugin registry")

@@ -50,9 +50,8 @@ func (p *fakeTeleportProcess) GetAuthServer() *auth.Server { return p.authServer
 func (p *fakeTeleportProcess) GetBackend() backend.Backend { return p.backend }
 
 // TestActivationTurnsOnGoogleOIDC reproduces, in order, exactly what
-// tool/teleport-google/main.go's activateGoogleOIDC does before it hands
-// control to common.Run, and then proves each of the three things the fork
-// entrypoint exists to turn on:
+// Activate does before it hands control to common.Run, and then proves each
+// of the three things the fork entrypoint exists to turn on:
 //
 //  1. entitlement live: the auth server built AFTER modules.SetModules reports
 //     the OIDC entitlement through Ping, and AssertOIDCEntitlement agrees;
@@ -66,14 +65,15 @@ func (p *fakeTeleportProcess) GetBackend() backend.Backend { return p.backend }
 //     and calling the proxy login route runs the actual production closure
 //     instead of a 404.
 //
-// This is the seam tool/teleport/main.go leaves untouched: it never calls
-// modules.SetModules and never builds a plugin registry, so none of this runs
-// in the upstream binary. See TestActivationRequiresModulesBeforeServer below
-// for the mutation that proves the ordering matters.
+// Upstream tool/teleport/main.go never called modules.SetModules and never
+// built a plugin registry, so none of this ran in the upstream binary. The
+// fork calls Activate from tool/teleport/main.go so that it does. See
+// TestActivationRequiresModulesBeforeServer below for the mutation that
+// proves the ordering matters.
 func TestActivationTurnsOnGoogleOIDC(t *testing.T) {
 	ctx := context.Background()
 
-	// Step 1 of activateGoogleOIDC: install the entitlement wrapper. This
+	// Step 1 of Activate: install the entitlement wrapper. This
 	// MUST run before the auth server is built, exactly as the doc comment on
 	// modules.SetModules and on WithOIDC requires.
 	prev := modules.GetModules()
@@ -97,7 +97,7 @@ func TestActivationTurnsOnGoogleOIDC(t *testing.T) {
 	require.NoError(t, AssertOIDCEntitlement(ctx, srv.Auth()),
 		"the auth server built after modules.SetModules must report the OIDC entitlement live")
 
-	// Step 2 of activateGoogleOIDC: build the registry and install the fork
+	// Step 2 of Activate: build the registry and install the fork
 	// plugin, exactly as googleoidc.Install does.
 	registry := plugin.NewRegistry()
 	require.NoError(t, Install(registry))

@@ -101,30 +101,38 @@ must be rewritten before that build is published.
 These keep their existing upstream AGPL notices. Do not add a Psiphon copyright
 line to a file the fork only edits.
 
-READ THIS AS TWO COUNTS, not as one total. 25 upstream files are modified: **3 Go
-files** and **22 non-Go files**. Measured on 2026-08-21 against the fork base
+READ THIS AS TWO COUNTS, not as one total. 27 upstream files are modified: **4 Go
+files** and **23 non-Go files**. Measured on 2026-08-21 against the fork base
 `e0d3c67924a`.
 
 The two counts answer different questions and must not be added together in
 planning. The original "keep the modified upstream surface small" rule was about
 GO files and rebase risk, because Go is where upstream churn is heavy and a
 conflict is expensive. An asset, a lockfile entry or a line of web copy carries
-almost no rebase cost. A single total of 25 hides the number the rule was
-defending, which is 3.
+almost no rebase cost. A single total of 27 hides the number the rule was
+defending, which is 4.
 
-Three Go files are modified:
+Four Go files are modified:
 
 - `lib/auth/oidc.go`
 - `lib/versioncontrol/github/github.go`
 - `tool/teleport/common/teleport.go`
+- `tool/teleport/main.go`
 
-Twenty-two further upstream files are modified. Of those, 19 are under `web/`
+`tool/teleport/main.go` is the server entrypoint. The fork calls
+`googleoidc.Activate` there so the binary is named `teleport` and the Helm
+chart, the operator, and `make` all build the same thing. The file is 40 lines
+and took 0 commits in the 97 that currently sit on upstream master. The
+activation stays behind `TELEPORT_ENABLE_GOOGLE_OIDC`.
+
+Twenty-three further upstream files are modified. Of those, 20 are under `web/`
 and 3 are neither Go nor web.
 
 Branding and licence text:
 
 - `README.md`
 - `web/packages/teleport/src/Login/Login.tsx`
+- `web/packages/teleport/src/Login/Login.test.tsx`
 - `web/packages/teleport/src/components/Onboard/OnboardFooter.tsx`
 - `web/packages/teleport/src/components/Onboard/OnboardFooter.test.tsx`
 - `web/packages/teleport/index.html`
@@ -198,8 +206,8 @@ git diff --name-status e0d3c67924a..HEAD \
   | grep -v 'lib/googleoidc\|tool/teleport-google\|docs/psiphon-access'
 ```
 
-It must print 25 paths: the three Go files and the twenty-two files above, and
-nothing else. Verified on 2026-08-21, when it printed exactly those 25.
+It must print 27 paths: the four Go files and the twenty-three files above, and
+nothing else. Verified on 2026-08-21, when it printed exactly those 27.
 
 Neither number is a cap. The fork keeps the modified upstream surface small as a
 goal, and the root `README.md` states how an addition is justified. If the

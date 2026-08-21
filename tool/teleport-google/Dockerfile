@@ -5,9 +5,9 @@
 # never been built, and its output has never been run. Treat every stage as
 # a starting point to prove out, not a working artifact.
 #
-# Builds the fork binary, tool/teleport-google, which is
-# tool/teleport/main.go plus the Google OIDC activation gate
-# (TELEPORT_ENABLE_GOOGLE_OIDC). It replaces the upstream teleport image, the
+# Builds the fork binary from tool/teleport, which is upstream
+# tool/teleport/main.go plus googleoidc.Activate (TELEPORT_ENABLE_GOOGLE_OIDC).
+# It replaces the upstream teleport image, the
 # way build.assets/charts/Dockerfile-distroless replaces a .deb-based image
 # with a distroless one:
 #   - same runtime base image (BASE_IMAGE, distroless/cc-debian12 by default)
@@ -80,7 +80,7 @@ ENV GOFLAGS=-buildvcs=false
 RUN go build \
     -tags "grpcnotrace webassets_embed" \
     -o /out/teleport \
-    ./tool/teleport-google
+    ./tool/teleport
 
 ## RUNTIME #####################################################################
 FROM debian:12 AS staging
