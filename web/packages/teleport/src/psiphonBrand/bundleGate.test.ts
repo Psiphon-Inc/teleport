@@ -497,11 +497,37 @@ describe('a template entry, consumed by its quasis', () => {
     // `${`. Babel records no expression span there, so neither does this.
     const actions = replacementShape('run: \\${{ env.TELEPORT_VERSION }}');
     expect(actions.hasExpressions).toBe(false);
+    expect(actions.hasEscapedDollarBrace).toBe(true);
     expect(actions.quasis).toEqual(['run: \\${{ env.TELEPORT_VERSION }}']);
 
     // An unterminated span means the catalog holds text no source reader could
     // have produced. Reporting a residual would hide a broken entry.
     expect(() => replacementShape('a ${x')).toThrow(/never closes/);
+  });
+
+  it('accounts the real quasi after an escaped dollar-brace', () => {
+    const shipped = BRAND_CATALOG.find(candidate =>
+      candidate.replacement.includes('env.TELEPORT_PROXY_ADDR')
+    );
+    expect(shipped).toBeDefined();
+
+    // The template rewrite escapes each backslash, backtick, and dollar-brace.
+    // This is the source form that the emitted chunk keeps.
+    const emittedReplacement = (shipped as BrandPhrase).replacement
+      .replace(/\\/g, '\\\\')
+      .replace(/`/g, '\\`')
+      .replace(/\$\{/g, '\\${');
+    const code = `var q=\`${emittedReplacement}\`;`;
+    const result = scanBundleResidual(
+      'app/app.js',
+      code,
+      [shipped as BrandPhrase],
+      []
+    );
+
+    expect(result.totalOccurrences).toBe(10);
+    expect(result.accountedByCatalog).toBe(10);
+    expect(result.residualOccurrences).toBe(0);
   });
 
   it('every shipped catalog replacement parses into quasis', () => {
@@ -547,12 +573,12 @@ describe('a template entry, consumed by its quasis', () => {
     // else's to account.
     const withExpression = entry({
       source:
-        'addr = ${cfg.teleportProxy}\n  teleport_proxy_public_addr = ok\n',
+        'proxy address = ${cfg.teleportProxy}\n  teleport_proxy_public_addr = ok\n',
       replacement:
-        'addr = ${cfg.teleportProxy}\n  teleport_proxy_public_addr = ok\n',
+        'proxy address = ${cfg.teleportProxy}\n  teleport_proxy_public_addr = ok\n',
     });
     const code =
-      'var q=`addr = ${e.teleportProxy}\n  teleport_proxy_public_addr = ok\n`;';
+      'var q=`proxy address = ${e.teleportProxy}\n  teleport_proxy_public_addr = ok\n`;';
     const result = scanBundleResidual('app/app.js', code, [withExpression], []);
     expect(result.totalOccurrences).toBe(2);
     expect(result.accountedByCatalog).toBe(1);

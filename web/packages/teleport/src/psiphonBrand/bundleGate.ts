@@ -186,7 +186,10 @@ export function namespaceLiteralMatches(
  *      author-written expression text such as `${moduleSrc}` and the minified
  *      chunk holds `${i}`. The literal spans between the expressions, the
  *      QUASIS, are what can be matched.
- *   2. A WHOLE-NODE ENTRY. `sortLongestFirst` drops one, and that filter is
+ *   2. AN ESCAPED DOLLAR-BRACE. The catalog holds one backslash before `${`.
+ *      The template rewrite escapes the backslash and `${`. The chunk holds
+ *      three backslashes, but babel still records all of this text as a quasi.
+ *   3. A WHOLE-NODE ENTRY. `sortLongestFirst` drops one, and that filter is
  *      correct: a chunk has no AST nodes, so the only thing a substring reader
  *      could do with an immutable bare-word entry is account every lower-case
  *      occurrence in the product in one sweep. `ref-o74l.3.10` measured that it
@@ -194,7 +197,7 @@ export function namespaceLiteralMatches(
  *      is a COMPLETE QUOTED STRING, which is the same idea
  *      `namespaceLiteralMatches` already uses for amendment 8.
  *
- * ONE MECHANISM SERVES BOTH. Match the entry's quasi sequence, in order,
+ * ONE MECHANISM SERVES ALL THREE. Match the entry's quasi sequence, in order,
  * against a complete quoted string: the character before the first quasi and
  * the character after the last quasi must be the SAME quote, and every gap
  * between two quasis must be an expression span. A whole-node entry has one
@@ -256,6 +259,8 @@ export interface ReplacementShape {
   readonly quasis: readonly string[];
   /** True when the replacement holds at least one `${...}` expression. */
   readonly hasExpressions: boolean;
+  /** True when a quasi holds `${` escaped by a backslash. */
+  readonly hasEscapedDollarBrace: boolean;
 }
 
 /** True when the `${` at `index` is escaped, so it is literal text. */
@@ -372,14 +377,16 @@ function skipExpression(text: string, open: number): number {
  */
 export function replacementShape(replacement: string): ReplacementShape {
   const quasis: string[] = [];
+  let hasEscapedDollarBrace = false;
   let cursor = 0;
   let i = 0;
   while (i < replacement.length) {
-    if (
-      replacement[i] === '$' &&
-      replacement[i + 1] === '{' &&
-      !isEscaped(replacement, i)
-    ) {
+    if (replacement[i] === '$' && replacement[i + 1] === '{') {
+      if (isEscaped(replacement, i)) {
+        hasEscapedDollarBrace = true;
+        i += 2;
+        continue;
+      }
       const after = skipExpression(replacement, i);
       if (after < 0) {
         throw new Error(
@@ -395,7 +402,19 @@ export function replacementShape(replacement: string): ReplacementShape {
     i++;
   }
   quasis.push(replacement.slice(cursor));
-  return { quasis, hasExpressions: quasis.length > 1 };
+  return {
+    quasis,
+    hasExpressions: quasis.length > 1,
+    hasEscapedDollarBrace,
+  };
+}
+
+/** Convert a rewritten template quasi to the source form in the chunk. */
+function escapeRewrittenTemplateQuasi(quasi: string): string {
+  return quasi
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$\{/g, '\\${');
 }
 
 /**
@@ -870,11 +889,17 @@ export function scanBundleResidual(
     .filter(entry => holdsBrand(entry.replacement))
     .map(entry => {
       const shape = replacementShape(entry.replacement);
-      return { entry, shape, evidence: shape.quasis.map(evidenceOf) };
+      const quasis =
+        entry.source === entry.replacement
+          ? shape.quasis
+          : shape.quasis.map(escapeRewrittenTemplateQuasi);
+      return { entry, shape, quasis, evidence: quasis.map(evidenceOf) };
     })
     .filter(
       candidate =>
-        candidate.shape.hasExpressions || isWholeNodeEntry(candidate.entry)
+        candidate.shape.hasExpressions ||
+        candidate.shape.hasEscapedDollarBrace ||
+        isWholeNodeEntry(candidate.entry)
     )
     .sort(
       (a, b) =>
@@ -892,10 +917,10 @@ export function scanBundleResidual(
         candidates.push(i + 1);
       }
     }
-    for (const { entry, shape, evidence } of bounded) {
+    for (const { entry, quasis, evidence } of bounded) {
       const whole = isWholeNodeEntry(entry);
       for (const at of candidates) {
-        const spans = matchBoundedRegion(code, shape.quasis, at, evidence);
+        const spans = matchBoundedRegion(code, quasis, at, evidence);
         if (!spans) {
           continue;
         }
